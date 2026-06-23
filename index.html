@@ -8,6 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
     <style>
         :root {
@@ -153,7 +154,7 @@
             <h4>Detailed Tracking Logs:</h4>
             <div id="report-logs"></div>
         </div>
-        <button class="btn-primary download-btn" id="download-btn" onclick="downloadReportAsPNG()">Download Report as PNG</button>
+        <button class="btn-primary download-btn" id="download-btn" onclick="downloadReportAsPDF()">Download Report as PDF</button>
     </div>
 </div>
 
@@ -175,14 +176,12 @@
     const firstScriptTag = document.getElementsByTagName('script')[0];
     firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 
-    // OPTIMIZATION 1: Robust Extractor for /live/, /shorts/, ?si=, and standard links
     function extractVideoID(url) {
         const regExp = /^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=|\/live\/|\/shorts\/)([^#\&\?]*).*/;
         const match = url.match(regExp);
         return (match && match[2].length === 11) ? match[2] : null;
     }
 
-    // OPTIMIZATION 2: Smart Time Formatter for > 1 Hour Videos (HH:MM:SS)
     function formatTimeSec(seconds) { 
         if (isNaN(seconds)) return "0:00"; 
         const h = Math.floor(seconds / 3600);
@@ -381,7 +380,6 @@
     function onPlaybackRateChange(event) { currentSpeed = event.data; document.getElementById('speed-slider').value = currentSpeed; document.getElementById('speed-display').innerText = currentSpeed + "x"; logActivity("Speed", `Playback speed changed to ${currentSpeed}x`, player.getCurrentTime()); }
     function logActivity(action, details, vTimeSec) { activityLogs.push({ realTime: new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true }), videoTime: formatTimeSec(vTimeSec), action, details }); }
 
-    // OPTIMIZATION 3: Formats Total Session Duration with Hours Support
     function formatDur(ms) { 
         const totalSec = Math.floor(ms / 1000);
         const h = Math.floor(totalSec / 3600);
@@ -409,8 +407,6 @@
     let watchChart = null;
     function generateGraph() {
         if(watchChart) watchChart.destroy();
-        
-        // OPTIMIZATION 4: Smart Data Decimation for Long Videos (Prevents browser freeze on 24hr videos)
         const maxPoints = 500;
         const step = Math.ceil(graphData.length / maxPoints);
         const optimizedX = graphData.filter((_, i) => i % step === 0).map(d => d.x);
@@ -418,10 +414,7 @@
 
         watchChart = new Chart(document.getElementById('watchGraph').getContext('2d'), { 
             type: 'line', 
-            data: { 
-                labels: optimizedX, 
-                datasets: [{ label: 'Video Timeline Position (sec)', data: optimizedY, borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.2)', borderWidth: 2, pointRadius: 0, tension: 0.1 }] 
-            }, 
+            data: { labels: optimizedX, datasets: [{ label: 'Video Timeline Position (sec)', data: optimizedY, borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.2)', borderWidth: 2, pointRadius: 0, tension: 0.1 }] }, 
             options: { responsive: true, maintainAspectRatio: false } 
         });
     }
@@ -434,11 +427,42 @@
         new QRCode(document.getElementById("qrcode"), { text: authSignature, width: 200, height: 200, colorDark: "#0f172a", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.H });
     }
 
-    function downloadReportAsPNG() {
-        const btn = document.getElementById('download-btn'); btn.innerText = "Preparing... (Please wait)"; btn.disabled = true;
-        html2canvas(document.getElementById('printable-report'), { scale: 2, useCORS: true, backgroundColor: "#ffffff" }).then(c => {
-            const a = document.createElement('a'); a.href = c.toDataURL("image/png"); a.download = `Video_Audit_Report_${new Date().getTime()}.png`; a.click();
-            btn.innerText = "Download Report as PNG"; btn.disabled = false;
+    // ---------------- PDF Generation Logic (NEW) ----------------
+    function downloadReportAsPDF() {
+        const btn = document.getElementById('download-btn'); 
+        btn.innerText = "Preparing PDF... (Please wait)"; 
+        btn.disabled = true;
+
+        const reportElement = document.getElementById('printable-report');
+
+        html2canvas(reportElement, { 
+            scale: 2, // High resolution for clear text and QR in PDF
+            useCORS: true, 
+            backgroundColor: "#ffffff" 
+        }).then(canvas => {
+            const imgData = canvas.toDataURL("image/png");
+            
+            // Access jsPDF from the window object
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF('p', 'mm', 'a4'); // Portrait, Millimeters, A4 standard size
+            
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            // Calculate proportional height based on A4 width
+            const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+            
+            // Add the snapshot to the PDF (x: 0, y: 0)
+            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+            
+            // Trigger PDF Download
+            pdf.save(`Video_Audit_Report_${new Date().getTime()}.pdf`);
+            
+            btn.innerText = "Download Report as PDF"; 
+            btn.disabled = false;
+        }).catch(err => {
+            console.error(err);
+            alert("Error generating PDF!");
+            btn.innerText = "Download Report as PDF"; 
+            btn.disabled = false;
         });
     }
 </script>
