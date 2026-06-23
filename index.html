@@ -23,7 +23,6 @@
         .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
         .clock-box { background: #1e293b; color: #10b981; padding: 8px 15px; border-radius: 6px; font-family: monospace; font-size: 1.2rem; font-weight: bold; }
         
-        /* Refresh Button Style */
         .refresh-btn { background: #ef4444; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-size: 1rem; font-weight: bold; transition: 0.2s; display: flex; align-items: center; gap: 5px; }
         .refresh-btn:hover { background: #dc2626; }
         .header-actions { display: flex; gap: 10px; align-items: center; }
@@ -38,23 +37,19 @@
         #player-container { position: relative; width: 100%; padding-bottom: 56.25%; background: #000; }
         #player { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; pointer-events: none; }
         
-        /* Fullscreen handling */
         #video-wrapper:fullscreen { border-radius: 0; width: 100vw !important; height: 100vh !important; display: block; background: #000; }
         #video-wrapper:fullscreen #player-container { padding-bottom: 0; height: 100%; width: 100%; }
         
         #video-wrapper:-webkit-full-screen { border-radius: 0; width: 100vw !important; height: 100vh !important; display: block; background: #000; }
         #video-wrapper:-webkit-full-screen #player-container { padding-bottom: 0; height: 100%; width: 100%; }
         
-        /* Initial Big Play Button */
         #big-play-btn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(37, 99, 235, 0.9); color: white; border: none; font-size: 1.5rem; font-weight: bold; padding: 20px 40px; border-radius: 50px; cursor: pointer; z-index: 25; box-shadow: 0 4px 15px rgba(0,0,0,0.5); transition: 0.2s; }
         #big-play-btn:hover { background: #1d4ed8; transform: translate(-50%, -50%) scale(1.05); }
 
-        /* Blockers */
         .static-blocker { position: absolute; z-index: 10; background: transparent; cursor: default; }
         .blocker-top { top: 0; left: 0; width: 100%; height: 60px; }
         .blocker-bottom { bottom: 0; right: 0; width: 120px; height: 60px; }
 
-        /* Dynamic Shield */
         #dynamic-shield { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 20; display: none; cursor: pointer; }
         
         .skip-feedback { position: absolute; top: 50%; transform: translate(-50%, -50%); background: rgba(0, 0, 0, 0.75); color: white; padding: 15px 25px; border-radius: 30px; font-size: 1.5rem; font-weight: bold; pointer-events: none; opacity: 0; transition: opacity 0.3s ease; z-index: 30; }
@@ -82,10 +77,10 @@
         /* ---------------- Report Section ---------------- */
         #printable-report { background: #ffffff; padding: 30px; border-radius: 8px; border: 2px solid #e2e8f0; margin-top: 20px; }
         .pdf-section { margin-bottom: 30px; padding-bottom: 20px; }
-        .report-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px dashed #cbd5e1; padding-bottom: 15px; margin-bottom: 20px; }
         .summary-box { background: #f1f5f9; padding: 15px; border-radius: 6px; font-weight: bold; line-height: 1.6; }
-        #qrcode-container { text-align: center; background: #fff; padding: 15px; border: 1px solid #cbd5e1; border-radius: 8px; }
-        #qrcode-container p { margin: 10px 0 0 0; font-size: 0.85rem; color: #64748b; font-weight: bold; }
+        
+        #qrcode-container { text-align: center; background: #fff; padding: 25px; border: 1px solid #cbd5e1; border-radius: 8px; display: inline-block; margin: 0 auto; }
+        #qrcode-container p { margin: 15px 0 0 0; font-size: 1rem; color: #64748b; font-weight: bold; }
         #qrcode { display: flex; justify-content: center; }
         
         .chart-container { position: relative; width: 100%; height: 350px; margin: 20px 0; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; box-sizing: border-box; }
@@ -93,7 +88,6 @@
         .log-item span { font-weight: bold; }
         
         @media (max-width: 600px) {
-            .report-header { flex-direction: column; align-items: center; gap: 15px; text-align: center; }
             .chart-container { height: 250px; }
             #custom-controls { padding: 10px; }
             .control-group { gap: 5px; }
@@ -146,13 +140,17 @@
     
     <div id="report-wrapper" style="display:none;">
         <div id="printable-report">
+            
             <div id="pdf-section-summary" class="pdf-section">
-                <div class="report-header">
-                    <div>
-                        <h3 style="margin-top:0; color:#1e293b;">Official Watch Report</h3>
-                        <div class="summary-box" id="report-summary"></div>
-                    </div>
-                    <div id="qrcode-container"><div id="qrcode"></div><p>Auth Signature</p></div>
+                <h3 style="margin-top:0; color:#1e293b; border-bottom: 2px dashed #cbd5e1; padding-bottom: 10px;">Official Watch Report</h3>
+                <div class="summary-box" id="report-summary"></div>
+            </div>
+
+            <div id="pdf-section-qr" class="pdf-section" style="text-align: center;">
+                <h4 style="margin-bottom: 20px; color:#1e293b;">Authentication Signature</h4>
+                <div id="qrcode-container">
+                    <div id="qrcode"></div>
+                    <p>Auth Signature</p>
                 </div>
             </div>
 
@@ -165,29 +163,27 @@
                 <h4 style="margin-bottom:10px;">Detailed Tracking Logs:</h4>
                 <div id="report-logs"></div>
             </div>
+            
         </div>
         <button class="btn-primary download-btn" id="download-btn" onclick="downloadReportAsPDF()">Download Report as PDF</button>
     </div>
 </div>
 
 <script>
-    // ---------------- Refresh and Protection Logic ----------------
     function confirmRefresh() {
         if (confirm("Are you sure you want to refresh? All your tracking data will be permanently lost!")) {
-            window.onbeforeunload = null; // Remove the warning before reloading
+            window.onbeforeunload = null; 
             window.location.reload();
         }
     }
 
-    // Prevents accidental drag-to-refresh or F5
     window.addEventListener('beforeunload', function (e) {
-        if (sessionStartTime) { // Only warn if a video is loaded and tracking has started
+        if (sessionStartTime) { 
             e.preventDefault();
             e.returnValue = '';
         }
     });
 
-    // ---------------- Existing Logic ----------------
     function updateClock() { document.getElementById('ist-clock').innerText = new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true }); }
     setInterval(updateClock, 1000); updateClock();
 
@@ -341,7 +337,7 @@
     function generateReport() {
         if (!sessionStartTime) return; 
         
-        window.onbeforeunload = null; // Remove the warning since they are intentionally ending the session
+        window.onbeforeunload = null; 
         
         clearInterval(trackingInterval); player.pauseVideo();
         logActivity("System", "Report generation complete", player.getCurrentTime());
@@ -366,7 +362,7 @@
     function generateComplexQR() {
         document.getElementById("qrcode").innerHTML = ""; 
         const rawData = `S:${sessionStartTime.getTime()}|PT:${totalRealPlayTimeMs}|PA:${totalRealPauseTimeMs}|SK:${seekCount}|SP:${currentSpeed}`;
-        new QRCode(document.getElementById("qrcode"), { text: `AUTH_YT_${Math.floor(Math.random() * 999999)}_${btoa(encodeURIComponent(rawData)).substring(0, 50)}`, width: 200, height: 200, colorDark: "#0f172a", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.H });
+        new QRCode(document.getElementById("qrcode"), { text: `AUTH_YT_${Math.floor(Math.random() * 999999)}_${btoa(encodeURIComponent(rawData)).substring(0, 50)}`, width: 250, height: 250, colorDark: "#0f172a", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.H });
     }
 
     async function downloadReportAsPDF() {
@@ -382,7 +378,8 @@
             const margin = 10; 
             const contentWidth = pdfWidth - (margin * 2);
 
-            const sections = ['pdf-section-summary', 'pdf-section-graph', 'pdf-section-logs'];
+            // Added pdf-section-qr to the array to print it on its OWN page!
+            const sections = ['pdf-section-summary', 'pdf-section-qr', 'pdf-section-graph', 'pdf-section-logs'];
             
             for (let i = 0; i < sections.length; i++) {
                 const el = document.getElementById(sections[i]);
