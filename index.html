@@ -32,7 +32,7 @@
         #player-container { position: relative; width: 100%; padding-bottom: 56.25%; background: #000; }
         #player { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; pointer-events: none; }
         
-        /* Fullscreen handling (FIXED) */
+        /* Fullscreen handling */
         #video-wrapper:fullscreen { border-radius: 0; width: 100vw !important; height: 100vh !important; display: block; background: #000; }
         #video-wrapper:fullscreen #player-container { padding-bottom: 0; height: 100%; width: 100%; }
         
@@ -43,7 +43,7 @@
         #big-play-btn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(37, 99, 235, 0.9); color: white; border: none; font-size: 1.5rem; font-weight: bold; padding: 20px 40px; border-radius: 50px; cursor: pointer; z-index: 25; box-shadow: 0 4px 15px rgba(0,0,0,0.5); transition: 0.2s; }
         #big-play-btn:hover { background: #1d4ed8; transform: translate(-50%, -50%) scale(1.05); }
 
-        /* Blockers for Title and Logo BEFORE video starts */
+        /* Blockers for Title and Logo */
         .static-blocker { position: absolute; z-index: 10; background: transparent; cursor: default; }
         .blocker-top { top: 0; left: 0; width: 100%; height: 60px; }
         .blocker-bottom { bottom: 0; right: 0; width: 120px; height: 60px; }
@@ -61,7 +61,6 @@
 
         /* ---------------- Overlay Controls (Auto-hide) ---------------- */
         #custom-controls { position: absolute; bottom: 0; left: 0; width: 100%; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 12px; background: rgba(15, 23, 42, 0.85); padding: 15px 20px; color: white; flex-wrap: wrap; z-index: 40; transition: opacity 0.4s ease, transform 0.4s ease; }
-        /* Class to hide controls smoothly */
         #custom-controls.hidden { opacity: 0; pointer-events: none; transform: translateY(10px); }
 
         .control-group { display: flex; align-items: center; gap: 10px; }
@@ -83,7 +82,6 @@
         #qrcode-container { text-align: center; background: #fff; padding: 15px; border: 1px solid #cbd5e1; border-radius: 8px; }
         #qrcode-container p { margin: 10px 0 0 0; font-size: 0.85rem; color: #64748b; font-weight: bold; }
         #qrcode { display: flex; justify-content: center; }
-        #qrcode img, #qrcode canvas { max-width: 100%; height: auto; }
         
         .chart-container { position: relative; width: 100%; height: 350px; margin: 20px 0; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; box-sizing: border-box; }
         .log-item { padding: 8px; border-bottom: 1px solid #cbd5e1; font-size: 0.95rem; }
@@ -177,12 +175,23 @@
     const firstScriptTag = document.getElementsByTagName('script')[0];
     firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 
+    // OPTIMIZATION 1: Robust Extractor for /live/, /shorts/, ?si=, and standard links
     function extractVideoID(url) {
-        const match = url.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/);
+        const regExp = /^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=|\/live\/|\/shorts\/)([^#\&\?]*).*/;
+        const match = url.match(regExp);
         return (match && match[2].length === 11) ? match[2] : null;
     }
 
-    // ---------------- UI & Controls Show/Hide Logic ----------------
+    // OPTIMIZATION 2: Smart Time Formatter for > 1 Hour Videos (HH:MM:SS)
+    function formatTimeSec(seconds) { 
+        if (isNaN(seconds)) return "0:00"; 
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+        if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s}`;
+        return `${m}:${s}`; 
+    }
+
     function toggleControlsVisibility() {
         if (isControlsVisible) hideControls();
         else showControls();
@@ -196,12 +205,8 @@
             wrapper.style.cursor = "default";
             isControlsVisible = true;
         }
-        
         clearTimeout(hideControlsTimeout);
-        // Only auto-hide if the video is currently playing
-        if (isVideoPlaying) {
-            hideControlsTimeout = setTimeout(hideControls, 3500);
-        }
+        if (isVideoPlaying) hideControlsTimeout = setTimeout(hideControls, 3500);
     }
 
     function hideControls() {
@@ -215,23 +220,17 @@
         clearTimeout(hideControlsTimeout);
     }
 
-    // Show controls on mouse move (Desktop)
     let lastMouseX = 0, lastMouseY = 0;
     document.getElementById('video-wrapper').addEventListener('mousemove', (e) => {
         if (Math.abs(e.clientX - lastMouseX) > 5 || Math.abs(e.clientY - lastMouseY) > 5) {
-            showControls();
-            lastMouseX = e.clientX;
-            lastMouseY = e.clientY;
+            showControls(); lastMouseX = e.clientX; lastMouseY = e.clientY;
         }
     });
 
-    // Clicking the bottom controls bar should NOT hide it
     document.getElementById('custom-controls').addEventListener('click', (e) => {
-        e.stopPropagation();
-        showControls(); 
+        e.stopPropagation(); showControls(); 
     });
 
-    // Center 0.5s Flashing Icon
     function showCenterIcon(type) {
         const icon = document.getElementById('center-action-icon');
         icon.innerHTML = type === 'play' ? '▶' : '⏸';
@@ -239,7 +238,6 @@
         setTimeout(() => icon.classList.remove('show'), 500);
     }
 
-    // ---------------- Video Load & Init ----------------
     function initVideoLoad() {
         const videoId = extractVideoID(document.getElementById('video-url').value);
         if (!videoId) return alert("Please enter a valid YouTube link!");
@@ -257,7 +255,7 @@
         document.getElementById('progress-bar').value = 0;
         document.getElementById('big-play-btn').style.display = "block"; 
         
-        showControls(); // Ensure controls start visible
+        showControls(); 
         logActivity("System", "Video loaded. Waiting for user interaction.", 0);
 
         let currentOrigin = window.location.origin;
@@ -280,8 +278,7 @@
         event.stopPropagation();
         document.getElementById('big-play-btn').style.display = "none";
         if (player && typeof player.playVideo === 'function') {
-            player.playVideo();
-            isFirstPlay = false;
+            player.playVideo(); isFirstPlay = false;
         }
     }
 
@@ -291,23 +288,16 @@
         
         if (event.data == YT.PlayerState.PLAYING) {
             document.getElementById('dynamic-shield').style.display = "block";
-            isVideoPlaying = true; 
-            btn.innerHTML = "⏸ Pause"; 
-            btn.style.background = "#dc2626"; 
+            isVideoPlaying = true; btn.innerHTML = "⏸ Pause"; btn.style.background = "#dc2626"; 
             logActivity("Play", "Video started playing", vTime);
-            showCenterIcon('play');
-            showControls(); // Triggers auto-hide timer
+            showCenterIcon('play'); showControls(); 
         } else if (event.data == YT.PlayerState.PAUSED) {
-            isVideoPlaying = false; 
-            btn.innerHTML = "▶ Play"; 
-            btn.style.background = "#334155"; 
+            isVideoPlaying = false; btn.innerHTML = "▶ Play"; btn.style.background = "#334155"; 
             logActivity("Pause", "Video paused", vTime);
-            showCenterIcon('pause');
-            showControls(); // Video is paused, timer is cleared, controls stay visible
+            showCenterIcon('pause'); showControls(); 
         }
     }
 
-    // ---------------- Smart Click Handling Logic ----------------
     let clickTimer = null;
     function handleVideoClick(event) {
         if (isFirstPlay || !player || typeof player.getCurrentTime !== 'function') return;
@@ -316,29 +306,19 @@
         const clickX = event.clientX - rect.left;
         const clickY = event.clientY - rect.top;
         
-        // Define Center Zone: Middle 30% width and Middle 40% height of the screen
-        const isCenterClick = (clickX > rect.width * 0.35 && clickX < rect.width * 0.65 && 
-                               clickY > rect.height * 0.3 && clickY < rect.height * 0.7);
+        const isCenterClick = (clickX > rect.width * 0.35 && clickX < rect.width * 0.65 && clickY > rect.height * 0.3 && clickY < rect.height * 0.7);
 
         if (clickTimer) {
-            // It's a Double Click!
             clearTimeout(clickTimer); clickTimer = null;
-            if (!isCenterClick) { // Only skip if double clicked outside the center zone
+            if (!isCenterClick) { 
                 if (clickX < rect.width * 0.4) skipTime(-10); 
                 else if (clickX > rect.width * 0.6) skipTime(10); 
             }
         } else {
-            // It's a Single Click! Wait slightly to ensure it's not a double click
             clickTimer = setTimeout(() => { 
                 clickTimer = null; 
-                
-                if (isCenterClick) {
-                    // Center clicked -> Only Play/Pause (Controls visibility is not toggled)
-                    togglePlayPause();
-                } else {
-                    // Outer screen clicked -> Only Toggle Controls (Play state remains same)
-                    toggleControlsVisibility();
-                }
+                if (isCenterClick) togglePlayPause();
+                else toggleControlsVisibility();
             }, 250); 
         }
     }
@@ -355,8 +335,6 @@
         feedback.innerText = seconds > 0 ? ">> 10s" : "<< 10s"; feedback.style.left = seconds > 0 ? "75%" : "25%";
         feedback.classList.add('show'); setTimeout(() => feedback.classList.remove('show'), 400);
     }
-
-    function formatTimeSec(seconds) { if (isNaN(seconds)) return "0:00"; return `${Math.floor(seconds / 60)}:${Math.floor(seconds % 60).toString().padStart(2, '0')}`; }
     
     function updateCustomUI() {
         if (!player || !player.getCurrentTime || isDraggingTimeline) return;
@@ -365,8 +343,7 @@
     }
     
     function draggingTimeline() { 
-        isDraggingTimeline = true; 
-        showControls(); // Keep controls visible while interacting
+        isDraggingTimeline = true; showControls(); 
         if (!player || !player.getDuration) return; 
         document.getElementById('time-display').innerText = `${formatTimeSec((document.getElementById('progress-bar').value / 100) * player.getDuration())} / ${formatTimeSec(player.getDuration())}`; 
     }
@@ -404,7 +381,16 @@
     function onPlaybackRateChange(event) { currentSpeed = event.data; document.getElementById('speed-slider').value = currentSpeed; document.getElementById('speed-display').innerText = currentSpeed + "x"; logActivity("Speed", `Playback speed changed to ${currentSpeed}x`, player.getCurrentTime()); }
     function logActivity(action, details, vTimeSec) { activityLogs.push({ realTime: new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true }), videoTime: formatTimeSec(vTimeSec), action, details }); }
 
-    // ---------------- Report Generation ----------------
+    // OPTIMIZATION 3: Formats Total Session Duration with Hours Support
+    function formatDur(ms) { 
+        const totalSec = Math.floor(ms / 1000);
+        const h = Math.floor(totalSec / 3600);
+        const m = Math.floor((totalSec % 3600) / 60);
+        const s = totalSec % 60;
+        if (h > 0) return `${h} hr ${m} min ${s} sec`;
+        return `${m} min ${s} sec`; 
+    }
+
     function generateReport() {
         if (!sessionStartTime) return; clearInterval(trackingInterval); player.pauseVideo();
         logActivity("System", "Report generation complete", player.getCurrentTime());
@@ -420,12 +406,24 @@
         generateGraph(); generateComplexQR();
     }
     
-    function formatDur(ms) { const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)} min ${s % 60} sec`; }
-
     let watchChart = null;
     function generateGraph() {
         if(watchChart) watchChart.destroy();
-        watchChart = new Chart(document.getElementById('watchGraph').getContext('2d'), { type: 'line', data: { labels: graphData.map(d => d.x), datasets: [{ label: 'Video Timeline Position (sec)', data: graphData.map(d => d.y), borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.2)', borderWidth: 2, pointRadius: 0, tension: 0.1 }] }, options: { responsive: true, maintainAspectRatio: false } });
+        
+        // OPTIMIZATION 4: Smart Data Decimation for Long Videos (Prevents browser freeze on 24hr videos)
+        const maxPoints = 500;
+        const step = Math.ceil(graphData.length / maxPoints);
+        const optimizedX = graphData.filter((_, i) => i % step === 0).map(d => d.x);
+        const optimizedY = graphData.filter((_, i) => i % step === 0).map(d => d.y);
+
+        watchChart = new Chart(document.getElementById('watchGraph').getContext('2d'), { 
+            type: 'line', 
+            data: { 
+                labels: optimizedX, 
+                datasets: [{ label: 'Video Timeline Position (sec)', data: optimizedY, borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.2)', borderWidth: 2, pointRadius: 0, tension: 0.1 }] 
+            }, 
+            options: { responsive: true, maintainAspectRatio: false } 
+        });
     }
 
     function generateComplexQR() {
@@ -433,11 +431,7 @@
         const rawData = `S:${sessionStartTime.getTime()}|PT:${totalRealPlayTimeMs}|PA:${totalRealPauseTimeMs}|SK:${seekCount}|SP:${currentSpeed}`;
         const hashedData = btoa(encodeURIComponent(rawData)).substring(0, 50);
         const authSignature = `AUTH_YT_${Math.floor(Math.random() * 999999)}_${hashedData}`;
-        
-        // High Quality Size (200x200) & Density (H) for extreme clarity
-        new QRCode(document.getElementById("qrcode"), { 
-            text: authSignature, width: 200, height: 200, colorDark: "#0f172a", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.H 
-        });
+        new QRCode(document.getElementById("qrcode"), { text: authSignature, width: 200, height: 200, colorDark: "#0f172a", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.H });
     }
 
     function downloadReportAsPNG() {
