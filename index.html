@@ -455,4 +455,102 @@
     }
 
     function onPlaybackRateChange(event) {
-        currentSpeed = event.
+        currentSpeed = event.data;
+        document.getElementById('speed-slider').value = currentSpeed;
+        document.getElementById('speed-display').innerText = currentSpeed + "x";
+        logActivity("Speed", `Playback speed changed to ${currentSpeed}x`, player.getCurrentTime());
+    }
+
+    function logActivity(action, details, vTimeSec) {
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true });
+        activityLogs.push({ realTime: timeStr, videoTime: formatTimeSec(vTimeSec), action, details });
+    }
+
+    // 7. Report Generation
+    function formatDur(ms) {
+        const s = Math.floor(ms / 1000);
+        return `${Math.floor(s / 60)} min ${s % 60} sec`;
+    }
+
+    function generateReport() {
+        if (!sessionStartTime) return;
+        clearInterval(trackingInterval);
+        player.pauseVideo();
+        logActivity("System", "Report generation complete", player.getCurrentTime());
+
+        document.getElementById('video-wrapper').style.display = "none";
+        document.getElementById('generate-report-btn').style.display = "none";
+        document.getElementById('report-wrapper').style.display = "block";
+        document.getElementById('download-btn').style.display = "block";
+
+        if (document.fullscreenElement || document.webkitFullscreenElement) { toggleFullScreen(); }
+
+        document.getElementById('report-summary').innerHTML = `
+            Total Session Time: ${formatDur(new Date() - sessionStartTime)}<br>
+            Total Play Time: <span style="color: green;">${formatDur(totalRealPlayTimeMs)}</span><br>
+            Total Pause Time: <span style="color: red;">${formatDur(totalRealPauseTimeMs)}</span><br>
+            Total Seeks (Drags/Skips): <span style="color: orange;">${seekCount} times</span>
+        `;
+
+        let logsHTML = "";
+        activityLogs.forEach(l => {
+            let col = "black";
+            if(l.action === "Play") col = "green";
+            if(l.action === "Pause") col = "red";
+            if(l.action === "Seek/Drag") col = "orange";
+            if(l.action === "Speed") col = "blue";
+            logsHTML += `<div class="log-item"><span>[${l.realTime}]</span> | Video Time: <span>${l.videoTime}</span> | <span style="color:${col};">${l.action}</span> - ${l.details}</div>`;
+        });
+        document.getElementById('report-logs').innerHTML = logsHTML;
+
+        generateGraph();
+        generateComplexQR();
+    }
+
+    // 8. Graph & QR Generation
+    let watchChart = null;
+    function generateGraph() {
+        const ctx = document.getElementById('watchGraph').getContext('2d');
+        if(watchChart) watchChart.destroy(); 
+        const xData = graphData.map(d => d.x);
+        const yData = graphData.map(d => d.y);
+
+        watchChart = new Chart(ctx, {
+            type: 'line',
+            data: { labels: xData, datasets: [{ label: 'Video Timeline Position (sec)', data: yData, borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.2)', borderWidth: 2, pointRadius: 0, tension: 0.1 }] },
+            options: { responsive: true, maintainAspectRatio: false, scales: { x: { title: { display: true, text: 'Real Time (Seconds spent on website)' } }, y: { title: { display: true, text: 'Video Timeline (Seconds)' } } }, plugins: { title: { display: true, text: 'Normal Watch = Straight line. Vertical jumps = Seeking/Dragging.' } } }
+        });
+    }
+
+    function generateComplexQR() {
+        document.getElementById("qrcode").innerHTML = ""; 
+        const rawData = `S:${sessionStartTime.getTime()}|PT:${totalRealPlayTimeMs}|PA:${totalRealPauseTimeMs}|SK:${seekCount}|SP:${currentSpeed}`;
+        const hashedData = btoa(encodeURIComponent(rawData)).substring(0, 50); 
+        const authSignature = `AUTH_YT_${Math.floor(Math.random() * 999999)}_${hashedData}`;
+        new QRCode(document.getElementById("qrcode"), { text: authSignature, width: 100, height: 100, colorDark: "#0f172a", colorLight: "#ffffff" });
+    }
+
+    function downloadReportAsPNG() {
+        const reportElement = document.getElementById('printable-report');
+        const btn = document.getElementById('download-btn');
+        btn.innerText = "Preparing... (Please wait)";
+        btn.disabled = true;
+
+        html2canvas(reportElement, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }).then(canvas => {
+            const a = document.createElement('a');
+            a.href = canvas.toDataURL("image/png");
+            a.download = `Video_Audit_Report_${new Date().getTime()}.png`;
+            a.click();
+            btn.innerText = "Download Report as PNG";
+            btn.disabled = false;
+        }).catch(() => {
+            alert("Error generating screenshot!");
+            btn.innerText = "Download Report as PNG";
+            btn.disabled = false;
+        });
+    }
+</script>
+
+</body>
+</html>
