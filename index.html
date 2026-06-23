@@ -79,15 +79,11 @@
         .download-btn:hover { background: #059669; }
         
         /* ---------------- Report Section ---------------- */
-        #printable-report { border-radius: 8px; margin-top: 20px; width: 100%; box-sizing: border-box; word-wrap: break-word; }
+        #printable-report { background: #ffffff; border-radius: 8px; margin-top: 20px; width: 100%; box-sizing: border-box; word-wrap: break-word; }
         
-        /* PDF specific styles */
-        .session-report-block { padding: 20px; border: 2px solid #e2e8f0; border-radius: 8px; margin-bottom: 20px; background: #ffffff; width: 100%; box-sizing: border-box; }
+        .session-report-block { padding: 20px; border: 2px solid #e2e8f0; border-radius: 8px; margin-bottom: 30px; background: #ffffff; width: 100%; box-sizing: border-box; }
         
-        .new-data-format { display: flex; flex-direction: column; gap: 10px; margin: 20px 0; width: 100%; }
-        .data-card { display: flex; justify-content: space-between; align-items: center; background: #f1f5f9; padding: 12px 20px; border-radius: 8px; border: 1px solid #e2e8f0; width: 100%; word-wrap: break-word; }
-        .data-title { font-weight: bold; color: #475569; font-size: 1rem; flex: 1; }
-        .data-value { font-weight: bold; font-size: 1.1rem; text-align: right; }
+        .summary-box { background: #f1f5f9; padding: 15px; border-radius: 6px; font-weight: bold; line-height: 1.8; text-align: left; max-width: 500px; margin: 0 auto 30px auto; font-size: 1.05rem; }
         
         .qr-wrapper { text-align: center; margin: 0 auto; padding: 20px; }
         .qr-wrapper p { margin: 15px 0 0 0; font-size: 1rem; color: #64748b; font-weight: bold; }
@@ -103,8 +99,6 @@
             .control-group { gap: 8px; justify-content: center; width: 100%; }
             #progress-bar { width: 100%; order: -1; margin-bottom: 5px; } 
             .input-group { flex-direction: column; }
-            .data-card { flex-direction: column; align-items: flex-start; gap: 5px; }
-            .data-value { text-align: left; }
         }
     </style>
 </head>
@@ -169,7 +163,7 @@
     
     <div id="report-wrapper" style="display:none;">
         <div id="printable-report"></div>
-        <button class="btn-primary download-btn" id="download-btn" onclick="downloadReportAsPDF()">Download 4 Separate PDFs</button>
+        <button class="btn-primary download-btn" id="download-btn" onclick="downloadReportAsPDF()">Download Report as PDF</button>
     </div>
 </div>
 
@@ -183,6 +177,7 @@
     document.addEventListener('touchmove', e => {
         let touchY = e.touches[0].clientY;
         let touchDiff = touchY - touchStartY;
+        // Blocks refresh ONLY when pulled from the absolute top. Scrolling is fully smooth.
         if (touchDiff > 0 && window.scrollY === 0) {
             e.preventDefault(); 
         }
@@ -207,7 +202,6 @@
     function updateClock() { document.getElementById('ist-clock').innerText = new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true }); }
     setInterval(updateClock, 1000); updateClock();
 
-    // Global variable added to ensure PDF IDs stay consistent during download process
     let globalSessionId = null; 
     let player, activityLogs = [], graphData = [], sessionStartTime = null, isVideoPlaying = false;
     let trackingInterval, lastVideoTime = 0, totalRealPlayTimeMs = 0, totalRealPauseTimeMs = 0;
@@ -380,7 +374,7 @@
     function logActivity(action, details, vTimeSec) { activityLogs.push({ realTime: new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true }), videoTime: formatTimeSec(vTimeSec), action, details }); }
     function formatDur(ms) { const totalSec = Math.floor(ms / 1000), h = Math.floor(totalSec / 3600), m = Math.floor((totalSec % 3600) / 60), s = totalSec % 60; if (h > 0) return `${h} hr ${m} min ${s} sec`; return `${m} min ${s} sec`; }
 
-    // ---------------- Modular Report Generation (Divided into 4 independent HTML structures) ----------------
+    // ---------------- Modular Report Generation ----------------
     function generateReport() {
         if (!sessionStartTime) return; 
         window.onbeforeunload = null; 
@@ -396,70 +390,57 @@
         if (document.fullscreenElement || document.webkitFullscreenElement) toggleFullScreen();
 
         reportCounter++;
-        // Saving ID globally so sequential PDF download can identify the parts
         globalSessionId = Date.now(); 
 
         let logsHTML = ""; 
         activityLogs.forEach(l => { 
             let col = l.action === "Play" ? "green" : l.action === "Pause" ? "red" : l.action === "Seek/Drag" ? "orange" : "blue";
-            logsHTML += `<div class="log-item"><span>[${l.realTime}]</span> | <span style="color: #000000;">Video Time:</span> <span>${l.videoTime}</span> | <span style="color:${col};">${l.action}</span> - <span style="color: #000000;">${l.details}</span></div>`; 
+            logsHTML += `<div class="log-item" style="page-break-inside: avoid;"><span>[${l.realTime}]</span> | <span style="color: #000000;">Video Time:</span> <span>${l.videoTime}</span> | <span style="color:${col};">${l.action}</span> - <span style="color: #000000;">${l.details}</span></div>`; 
         });
 
-        // 1. Structure for PDF 1 (Summary)
-        const summaryTemplate = `
-            <div id="pdf-summary-${globalSessionId}" class="session-report-block" style="background-color: #ffffff;">
-                <h2 style="text-align:center; color:#1e293b; border-bottom: 2px solid #cbd5e1; padding-bottom: 15px; margin-top:0;">Official Watch Report (Session ${reportCounter})</h2>
-                <div class="new-data-format">
-                    <div class="data-card" style="background-color: #f1f5f9;">
-                        <span class="data-title" style="color: #475569;">Total Session Time</span>
-                        <span class="data-value" style="color: #000000;">${formatDur(new Date() - sessionStartTime)}</span>
-                    </div>
-                    <div class="data-card" style="background-color: #f1f5f9;">
-                        <span class="data-title" style="color: #475569;">Total Play Time</span>
-                        <span class="data-value" style="color: green;">${formatDur(totalRealPlayTimeMs)}</span>
-                    </div>
-                    <div class="data-card" style="background-color: #f1f5f9;">
-                        <span class="data-title" style="color: #475569;">Total Pause Time</span>
-                        <span class="data-value" style="color: red;">${formatDur(totalRealPauseTimeMs)}</span>
-                    </div>
-                    <div class="data-card" style="background-color: #f1f5f9;">
-                        <span class="data-title" style="color: #475569;">Total Seeks (Drags/Skips)</span>
-                        <span class="data-value" style="color: orange;">${seekCount} times</span>
+        // Merged Master Container mapping to 4 distinct PDF Pages using page-break
+        const reportTemplate = `
+            <div id="master-pdf-container-${globalSessionId}" class="session-report-block" style="background-color: #ffffff;">
+                
+                <div style="text-align:center; padding-bottom: 20px;">
+                    <h2 style="margin-top:0; color:#1e293b; border-bottom: 2px dashed #cbd5e1; padding-bottom: 15px;">Official Watch Report (Session ${reportCounter})</h2>
+                    <div class="summary-box">
+                        Total Session Time: ${formatDur(new Date() - sessionStartTime)}<br>
+                        Total Play Time: <span style="color: green;">${formatDur(totalRealPlayTimeMs)}</span><br>
+                        Total Pause Time: <span style="color: red;">${formatDur(totalRealPauseTimeMs)}</span><br>
+                        Total Seeks (Drags/Skips): <span style="color: orange;">${seekCount} times</span>
                     </div>
                 </div>
-            </div>`;
 
-        // 2. Structure for PDF 2 (QR)
-        const qrTemplate = `
-            <div id="pdf-qr-${globalSessionId}" class="session-report-block" style="background-color: #ffffff; text-align: center; padding-top: 20px;">
-                <h3 style="margin-bottom: 30px; color:#1e293b;">Authentication Signature</h3>
-                <div class="qr-wrapper">
-                    <div id="qr-${globalSessionId}" style="display: flex; justify-content: center;"></div>
-                    <p style="color: #000000;">Auth Signature</p>
+                <div class="html2pdf__page-break"></div>
+
+                <div style="text-align: center; padding-top: 20px;">
+                    <h3 style="margin-bottom: 30px; color:#1e293b;">Authentication Signature</h3>
+                    <div class="qr-wrapper">
+                        <div id="qr-${globalSessionId}" style="display: flex; justify-content: center;"></div>
+                        <p style="color: #000000;">Auth Signature</p>
+                    </div>
                 </div>
-            </div>`;
 
-        // 3. Structure for PDF 3 (Graph)
-        const graphTemplate = `
-            <div id="pdf-graph-${globalSessionId}" class="session-report-block" style="background-color: #ffffff; padding-top: 20px;">
-                <h3 style="text-align: center; margin-bottom:20px; color:#1e293b;">Timeline Graph (Real-time vs. Video Time)</h3>
-                <div class="chart-container" id="chart-box-${globalSessionId}" style="background-color: #ffffff;">
-                    <canvas id="graph-${globalSessionId}"></canvas>
+                <div class="html2pdf__page-break"></div>
+
+                <div style="padding-top: 20px;">
+                    <h3 style="text-align: center; margin-bottom:20px; color:#1e293b;">Timeline Graph (Real-time vs. Video Time)</h3>
+                    <div class="chart-container" id="chart-box-${globalSessionId}" style="background-color: #ffffff; page-break-inside: avoid;">
+                        <canvas id="graph-${globalSessionId}"></canvas>
+                    </div>
                 </div>
-            </div>`;
 
-        // 4. Structure for PDF 4 (Logs)
-        const logsTemplate = `
-            <div id="pdf-logs-${globalSessionId}" class="session-report-block" style="background-color: #ffffff; padding-top: 20px;">
-                <h3 style="color:#1e293b; border-bottom: 1px solid #cbd5e1; padding-bottom: 10px;">Detailed Tracking Logs:</h3>
-                <div style="background-color: #ffffff;">${logsHTML}</div>
-            </div>`;
+                <div class="html2pdf__page-break"></div>
 
-        // Append all 4 independent templates inside the printable-report div
-        document.getElementById('printable-report').insertAdjacentHTML('afterbegin', logsTemplate);
-        document.getElementById('printable-report').insertAdjacentHTML('afterbegin', graphTemplate);
-        document.getElementById('printable-report').insertAdjacentHTML('afterbegin', qrTemplate);
-        document.getElementById('printable-report').insertAdjacentHTML('afterbegin', summaryTemplate);
+                <div style="padding-top: 20px;">
+                    <h3 style="color:#1e293b; border-bottom: 1px solid #cbd5e1; padding-bottom: 10px;">Detailed Tracking Logs:</h3>
+                    <div style="background-color: #ffffff;">${logsHTML}</div>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('printable-report').insertAdjacentHTML('afterbegin', reportTemplate);
 
         renderSpecificGraph(`graph-${globalSessionId}`, `chart-box-${globalSessionId}`, graphData);
         renderSpecificQR(`qr-${globalSessionId}`, totalRealPlayTimeMs, totalRealPauseTimeMs, seekCount, currentSpeed, sessionStartTime);
@@ -493,8 +474,8 @@
                 img.style.objectFit = "contain";
                 img.style.display = "block";
                 
-                chartBox.innerHTML = ""; // Clear canvas container completely
-                chartBox.appendChild(img); // Inject clean image 
+                chartBox.innerHTML = ""; 
+                chartBox.appendChild(img); 
             }
         }, 800);
     }
@@ -523,47 +504,36 @@
         }, 300);
     }
 
-    // ---------------- Sequential Download Function for 4 Separate PDFs ----------------
+    // ---------------- Merged PDF Download Generation ----------------
     async function downloadReportAsPDF() {
         const btn = document.getElementById('download-btn'); 
-        btn.innerText = "Generating 4 PDFs... (Please wait)"; 
+        btn.innerText = "Generating Merged PDF... (Please wait)"; 
         btn.disabled = true;
 
-        const optBase = {
+        const element = document.getElementById(`master-pdf-container-${globalSessionId}`);
+        const originalWidth = element.style.width;
+        element.style.width = '800px';
+
+        const opt = {
             margin:       10, 
+            filename:     `Video_Audit_Report_${new Date().getTime()}.pdf`,
             image:        { type: 'jpeg', quality: 1.0 },
             html2canvas:  { scale: 2, useCORS: true, windowWidth: 800, backgroundColor: '#ffffff' }, 
             jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
             pagebreak:    { mode: ['css', 'legacy'] } 
         };
 
-        const sid = globalSessionId;
-
-        // Waiting to ensure the graph and QR code images are fully processed
         setTimeout(async () => {
             try {
-                // PDF 1: Summary
-                btn.innerText = "Downloading 1 of 4 (Summary)...";
-                await html2pdf().set({ ...optBase, filename: `1_Watch_Summary_${sid}.pdf` }).from(document.getElementById(`pdf-summary-${sid}`)).save();
-
-                // PDF 2: QR Code
-                btn.innerText = "Downloading 2 of 4 (QR Code)...";
-                await html2pdf().set({ ...optBase, filename: `2_Auth_Signature_${sid}.pdf` }).from(document.getElementById(`pdf-qr-${sid}`)).save();
-
-                // PDF 3: Graph
-                btn.innerText = "Downloading 3 of 4 (Graph)...";
-                await html2pdf().set({ ...optBase, filename: `3_Timeline_Graph_${sid}.pdf` }).from(document.getElementById(`pdf-graph-${sid}`)).save();
-
-                // PDF 4: Detailed Logs (This one will naturally auto-paginate based on length)
-                btn.innerText = "Downloading 4 of 4 (Detailed Logs)...";
-                await html2pdf().set({ ...optBase, filename: `4_Detailed_Logs_${sid}.pdf` }).from(document.getElementById(`pdf-logs-${sid}`)).save();
-
-                btn.innerText = "Download 4 Separate PDFs"; 
+                await html2pdf().set(opt).from(element).save();
+                element.style.width = originalWidth;
+                btn.innerText = "Download Report as PDF"; 
                 btn.disabled = false;
             } catch (error) {
                 console.error(error);
-                alert("Error generating PDFs! Please try again.");
-                btn.innerText = "Download 4 Separate PDFs"; 
+                alert("Error generating PDF! Please try again.");
+                element.style.width = originalWidth;
+                btn.innerText = "Download Report as PDF"; 
                 btn.disabled = false;
             }
         }, 1200); 
