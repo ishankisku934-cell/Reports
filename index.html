@@ -20,9 +20,14 @@
         }
         body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
         .container { max-width: 900px; width: 100%; background: var(--card-bg); padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
-        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
         .clock-box { background: #1e293b; color: #10b981; padding: 8px 15px; border-radius: 6px; font-family: monospace; font-size: 1.2rem; font-weight: bold; }
         
+        /* Refresh Button Style */
+        .refresh-btn { background: #ef4444; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-size: 1rem; font-weight: bold; transition: 0.2s; display: flex; align-items: center; gap: 5px; }
+        .refresh-btn:hover { background: #dc2626; }
+        .header-actions { display: flex; gap: 10px; align-items: center; }
+
         .input-group { display: flex; gap: 10px; margin-bottom: 15px; }
         input[type="text"] { flex: 1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 1rem; }
         .btn-primary { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 1rem; font-weight: bold; transition: 0.2s; }
@@ -76,10 +81,7 @@
         
         /* ---------------- Report Section ---------------- */
         #printable-report { background: #ffffff; padding: 30px; border-radius: 8px; border: 2px solid #e2e8f0; margin-top: 20px; }
-        
-        /* Added spacing between sections specifically for clean PDF slicing */
         .pdf-section { margin-bottom: 30px; padding-bottom: 20px; }
-        
         .report-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px dashed #cbd5e1; padding-bottom: 15px; margin-bottom: 20px; }
         .summary-box { background: #f1f5f9; padding: 15px; border-radius: 6px; font-weight: bold; line-height: 1.6; }
         #qrcode-container { text-align: center; background: #fff; padding: 15px; border: 1px solid #cbd5e1; border-radius: 8px; }
@@ -104,7 +106,10 @@
 <div class="container">
     <div class="header">
         <h2>Advanced Video Tracker</h2>
-        <div class="clock-box" id="ist-clock">00:00:00 AM</div>
+        <div class="header-actions">
+            <button class="refresh-btn" onclick="confirmRefresh()" title="Refresh and Reset">🔄 Refresh</button>
+            <div class="clock-box" id="ist-clock">00:00:00 AM</div>
+        </div>
     </div>
 
     <div class="input-group">
@@ -141,7 +146,6 @@
     
     <div id="report-wrapper" style="display:none;">
         <div id="printable-report">
-            
             <div id="pdf-section-summary" class="pdf-section">
                 <div class="report-header">
                     <div>
@@ -161,13 +165,29 @@
                 <h4 style="margin-bottom:10px;">Detailed Tracking Logs:</h4>
                 <div id="report-logs"></div>
             </div>
-            
         </div>
         <button class="btn-primary download-btn" id="download-btn" onclick="downloadReportAsPDF()">Download Report as PDF</button>
     </div>
 </div>
 
 <script>
+    // ---------------- Refresh and Protection Logic ----------------
+    function confirmRefresh() {
+        if (confirm("Are you sure you want to refresh? All your tracking data will be permanently lost!")) {
+            window.onbeforeunload = null; // Remove the warning before reloading
+            window.location.reload();
+        }
+    }
+
+    // Prevents accidental drag-to-refresh or F5
+    window.addEventListener('beforeunload', function (e) {
+        if (sessionStartTime) { // Only warn if a video is loaded and tracking has started
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    });
+
+    // ---------------- Existing Logic ----------------
     function updateClock() { document.getElementById('ist-clock').innerText = new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true }); }
     setInterval(updateClock, 1000); updateClock();
 
@@ -319,7 +339,11 @@
     function formatDur(ms) { const totalSec = Math.floor(ms / 1000), h = Math.floor(totalSec / 3600), m = Math.floor((totalSec % 3600) / 60), s = totalSec % 60; if (h > 0) return `${h} hr ${m} min ${s} sec`; return `${m} min ${s} sec`; }
 
     function generateReport() {
-        if (!sessionStartTime) return; clearInterval(trackingInterval); player.pauseVideo();
+        if (!sessionStartTime) return; 
+        
+        window.onbeforeunload = null; // Remove the warning since they are intentionally ending the session
+        
+        clearInterval(trackingInterval); player.pauseVideo();
         logActivity("System", "Report generation complete", player.getCurrentTime());
         clearTimeout(hideControlsTimeout);
         document.getElementById('video-wrapper').style.display = "none"; document.getElementById('generate-report-btn').style.display = "none";
@@ -345,7 +369,6 @@
         new QRCode(document.getElementById("qrcode"), { text: `AUTH_YT_${Math.floor(Math.random() * 999999)}_${btoa(encodeURIComponent(rawData)).substring(0, 50)}`, width: 200, height: 200, colorDark: "#0f172a", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.H });
     }
 
-    // ---------------- PDF Auto-Pagination Engine ----------------
     async function downloadReportAsPDF() {
         const btn = document.getElementById('download-btn'); 
         btn.innerText = "Generating multi-page PDF... (Please wait)"; 
@@ -359,13 +382,11 @@
             const margin = 10; 
             const contentWidth = pdfWidth - (margin * 2);
 
-            // The exact groups/sections we want on separate pages
             const sections = ['pdf-section-summary', 'pdf-section-graph', 'pdf-section-logs'];
             
             for (let i = 0; i < sections.length; i++) {
                 const el = document.getElementById(sections[i]);
                 
-                // Render the specific group into a high-res image
                 const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
                 const imgData = canvas.toDataURL("image/png");
                 
@@ -374,25 +395,21 @@
                 const usablePageHeight = pdfHeight - (margin * 2);
                 
                 let heightLeft = imgHeight;
-                let position = margin; // Starting position on the Y axis
+                let position = margin; 
 
-                // Add a new page for every section EXCEPT the very first one
                 if (i > 0) { pdf.addPage(); }
 
-                // Add the first slice of the current section
                 pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
                 heightLeft -= usablePageHeight;
 
-                // Auto-pagination: If the section (like logs) is extremely long, automatically slice into new A4 pages
                 while (heightLeft > 0) {
                     pdf.addPage();
-                    position -= usablePageHeight; // Shift the image up mathematically to print the next part
+                    position -= usablePageHeight; 
                     pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
                     heightLeft -= usablePageHeight;
                 }
             }
             
-            // Save the final multipage PDF
             pdf.save(`Video_Audit_Report_${new Date().getTime()}.pdf`);
             
         } catch (err) {
