@@ -7,8 +7,7 @@
     
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
     <style>
         :root {
@@ -18,7 +17,10 @@
             --card-bg: #ffffff;
             --dark-player: #0f172a;
         }
-        body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        
+        /* Disable native pull-to-refresh on mobile browsers */
+        html, body { overscroll-behavior-y: none; font-family: 'Segoe UI', sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        
         .container { max-width: 900px; width: 100%; background: var(--card-bg); padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
         .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
         .clock-box { background: #1e293b; color: #10b981; padding: 8px 15px; border-radius: 6px; font-family: monospace; font-size: 1.2rem; font-weight: bold; }
@@ -75,16 +77,23 @@
         .download-btn:hover { background: #059669; }
         
         /* ---------------- Report Section ---------------- */
-        #printable-report { background: #ffffff; padding: 30px; border-radius: 8px; border: 2px solid #e2e8f0; margin-top: 20px; }
+        #printable-report { background: #ffffff; padding: 30px; border-radius: 8px; border: 2px solid #e2e8f0; margin-top: 20px; width: 100%; box-sizing: border-box;}
         .pdf-section { margin-bottom: 30px; padding-bottom: 20px; }
+        
+        /* PDF Page Break Classes */
+        .pdf-page-break { page-break-before: always; }
+        
+        .report-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px dashed #cbd5e1; padding-bottom: 15px; margin-bottom: 20px; }
         .summary-box { background: #f1f5f9; padding: 15px; border-radius: 6px; font-weight: bold; line-height: 1.6; }
         
-        #qrcode-container { text-align: center; background: #fff; padding: 25px; border: 1px solid #cbd5e1; border-radius: 8px; display: inline-block; margin: 0 auto; }
+        #qrcode-container { text-align: center; background: #fff; padding: 25px; border: 1px solid #cbd5e1; border-radius: 8px; display: inline-block; margin: 0 auto; page-break-inside: avoid; }
         #qrcode-container p { margin: 15px 0 0 0; font-size: 1rem; color: #64748b; font-weight: bold; }
         #qrcode { display: flex; justify-content: center; }
         
-        .chart-container { position: relative; width: 100%; height: 350px; margin: 20px 0; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; box-sizing: border-box; }
-        .log-item { padding: 8px; border-bottom: 1px solid #cbd5e1; font-size: 0.95rem; }
+        .chart-container { position: relative; width: 100%; height: 350px; margin: 20px 0; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; box-sizing: border-box; page-break-inside: avoid; }
+        
+        /* Prevents text from splitting in half across pages */
+        .log-item { padding: 8px; border-bottom: 1px solid #cbd5e1; font-size: 0.95rem; page-break-inside: avoid; }
         .log-item span { font-weight: bold; }
         
         @media (max-width: 600px) {
@@ -146,7 +155,7 @@
                 <div class="summary-box" id="report-summary"></div>
             </div>
 
-            <div id="pdf-section-qr" class="pdf-section" style="text-align: center;">
+            <div id="pdf-section-qr" class="pdf-section pdf-page-break" style="text-align: center;">
                 <h4 style="margin-bottom: 20px; color:#1e293b;">Authentication Signature</h4>
                 <div id="qrcode-container">
                     <div id="qrcode"></div>
@@ -154,12 +163,12 @@
                 </div>
             </div>
 
-            <div id="pdf-section-graph" class="pdf-section">
+            <div id="pdf-section-graph" class="pdf-section pdf-page-break">
                 <h4 style="margin-bottom:10px;">Timeline Graph (Real-time vs. Video Time):</h4>
                 <div class="chart-container"><canvas id="watchGraph"></canvas></div>
             </div>
 
-            <div id="pdf-section-logs" class="pdf-section">
+            <div id="pdf-section-logs" class="pdf-section pdf-page-break">
                 <h4 style="margin-bottom:10px;">Detailed Tracking Logs:</h4>
                 <div id="report-logs"></div>
             </div>
@@ -365,57 +374,33 @@
         new QRCode(document.getElementById("qrcode"), { text: `AUTH_YT_${Math.floor(Math.random() * 999999)}_${btoa(encodeURIComponent(rawData)).substring(0, 50)}`, width: 250, height: 250, colorDark: "#0f172a", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.H });
     }
 
-    async function downloadReportAsPDF() {
+    function downloadReportAsPDF() {
         const btn = document.getElementById('download-btn'); 
-        btn.innerText = "Generating multi-page PDF... (Please wait)"; 
+        btn.innerText = "Generating PDF... (Please wait)"; 
         btn.disabled = true;
 
-        try {
-            const { jsPDF } = window.jspdf;
-            const pdf = new jsPDF('p', 'mm', 'a4');
-            const pdfWidth = pdf.internal.pageSize.getWidth();
-            const pdfHeight = pdf.internal.pageSize.getHeight();
-            const margin = 10; 
-            const contentWidth = pdfWidth - (margin * 2);
+        const element = document.getElementById('printable-report');
 
-            // Added pdf-section-qr to the array to print it on its OWN page!
-            const sections = ['pdf-section-summary', 'pdf-section-qr', 'pdf-section-graph', 'pdf-section-logs'];
-            
-            for (let i = 0; i < sections.length; i++) {
-                const el = document.getElementById(sections[i]);
-                
-                const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
-                const imgData = canvas.toDataURL("image/png");
-                
-                const imgWidth = contentWidth;
-                const imgHeight = (canvas.height * imgWidth) / canvas.width;
-                const usablePageHeight = pdfHeight - (margin * 2);
-                
-                let heightLeft = imgHeight;
-                let position = margin; 
+        // html2pdf natively supports preventing page breaks inside elements
+        // and respects CSS 'page-break-before: always'
+        const opt = {
+            margin:       [10, 10, 10, 10],
+            filename:     `Video_Audit_Report_${new Date().getTime()}.pdf`,
+            image:        { type: 'jpeg', quality: 1 },
+            html2canvas:  { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+            pagebreak:    { mode: ['css', 'legacy'] } 
+        };
 
-                if (i > 0) { pdf.addPage(); }
-
-                pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
-                heightLeft -= usablePageHeight;
-
-                while (heightLeft > 0) {
-                    pdf.addPage();
-                    position -= usablePageHeight; 
-                    pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
-                    heightLeft -= usablePageHeight;
-                }
-            }
-            
-            pdf.save(`Video_Audit_Report_${new Date().getTime()}.pdf`);
-            
-        } catch (err) {
-            console.error(err);
-            alert("Error generating PDF!");
-        } finally {
+        html2pdf().set(opt).from(element).save().then(() => {
             btn.innerText = "Download Report as PDF"; 
             btn.disabled = false;
-        }
+        }).catch(err => {
+            console.error(err);
+            alert("Error generating PDF!");
+            btn.innerText = "Download Report as PDF"; 
+            btn.disabled = false;
+        });
     }
 </script>
 </body>
