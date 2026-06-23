@@ -20,7 +20,6 @@
             --dark-player: #0f172a;
         }
         
-        /* Removed overscroll-behavior to fix scrolling issues, handled via JS now */
         body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 15px 10px; overflow-x: hidden; }
         
         .container { max-width: 900px; width: 100%; background: var(--card-bg); padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); margin: 0 auto; }
@@ -80,21 +79,22 @@
         .download-btn:hover { background: #059669; }
         
         /* ---------------- Report Section ---------------- */
-        #printable-report { background: #ffffff; border-radius: 8px; margin-top: 20px; width: 100%; box-sizing: border-box;}
-        .session-report-block { padding: 20px; border: 2px solid #e2e8f0; border-radius: 8px; margin-bottom: 30px; background: #ffffff; width: 100%; box-sizing: border-box; overflow: hidden; }
+        #printable-report { background: #ffffff; border-radius: 8px; margin-top: 20px; width: 100%; box-sizing: border-box; word-wrap: break-word; }
         
-        /* New Data Format Styles */
-        .new-data-format { display: flex; flex-direction: column; gap: 10px; margin: 20px 0; }
-        .data-card { display: flex; justify-content: space-between; align-items: center; background: #f1f5f9; padding: 12px 20px; border-radius: 8px; border: 1px solid #e2e8f0; }
-        .data-title { font-weight: bold; color: #475569; font-size: 1rem; }
-        .data-value { font-weight: bold; font-size: 1.1rem; }
+        /* PDF specific styles */
+        .session-report-block { padding: 20px; border: 2px solid #e2e8f0; border-radius: 8px; margin-bottom: 30px; background: #ffffff; width: 100%; box-sizing: border-box; }
+        
+        .new-data-format { display: flex; flex-direction: column; gap: 10px; margin: 20px 0; width: 100%; }
+        .data-card { display: flex; justify-content: space-between; align-items: center; background: #f1f5f9; padding: 12px 20px; border-radius: 8px; border: 1px solid #e2e8f0; width: 100%; word-wrap: break-word; }
+        .data-title { font-weight: bold; color: #475569; font-size: 1rem; flex: 1; }
+        .data-value { font-weight: bold; font-size: 1.1rem; text-align: right; }
         
         .qr-wrapper { text-align: center; margin: 0 auto; padding: 20px; }
         .qr-wrapper p { margin: 15px 0 0 0; font-size: 1rem; color: #64748b; font-weight: bold; }
         
         .chart-container { position: relative; width: 100%; height: 350px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; box-sizing: border-box; }
         
-        .log-item { padding: 8px; border-bottom: 1px solid #cbd5e1; font-size: 0.95rem; }
+        .log-item { padding: 10px; border-bottom: 1px solid #cbd5e1; font-size: 0.95rem; word-wrap: break-word; white-space: normal; line-height: 1.4; }
         .log-item span { font-weight: bold; }
         
         @media (max-width: 600px) {
@@ -104,6 +104,7 @@
             #progress-bar { width: 100%; order: -1; margin-bottom: 5px; } 
             .input-group { flex-direction: column; }
             .data-card { flex-direction: column; align-items: flex-start; gap: 5px; }
+            .data-value { text-align: left; }
         }
     </style>
 </head>
@@ -174,7 +175,6 @@
 
 <script>
     // ---------------- Anti Pull-to-Refresh Logic (JS Method) ----------------
-    // This allows smooth scrolling up and down but PREVENTS the browser from refreshing when pulled from the top.
     let touchStartY = 0;
     document.addEventListener('touchstart', e => { 
         touchStartY = e.touches[0].clientY; 
@@ -183,7 +183,6 @@
     document.addEventListener('touchmove', e => {
         let touchY = e.touches[0].clientY;
         let touchDiff = touchY - touchStartY;
-        // If at the very top of the page and swiping downwards -> Block default pull refresh!
         if (touchDiff > 0 && window.scrollY === 0) {
             e.preventDefault(); 
         }
@@ -197,7 +196,6 @@
         }
     }
 
-    // Prevents accidental Back button or exit
     window.addEventListener('beforeunload', function (e) {
         if (sessionStartTime) { 
             e.preventDefault();
@@ -401,6 +399,7 @@
         let logsHTML = ""; 
         activityLogs.forEach(l => { 
             let col = l.action === "Play" ? "green" : l.action === "Pause" ? "red" : l.action === "Seek/Drag" ? "orange" : "blue";
+            // Ensure no line is cut in half across pages
             logsHTML += `<div class="log-item" style="page-break-inside: avoid;"><span>[${l.realTime}]</span> | Video Time: <span>${l.videoTime}</span> | <span style="color:${col};">${l.action}</span> - ${l.details}</div>`; 
         });
 
@@ -508,27 +507,24 @@
 
         const element = document.getElementById('printable-report');
 
-        // Prevent layout squishing by forcing a desktop-like width before print
-        const originalWidth = element.style.width;
-        element.style.width = '800px';
-
+        // Prevent layout squishing by dynamically adjusting styling before print
         const opt = {
             margin:       10, 
             filename:     `Video_Audit_Report_${new Date().getTime()}.pdf`,
             image:        { type: 'jpeg', quality: 1.0 },
-            html2canvas:  { scale: 2, useCORS: true, windowWidth: 800 }, 
-            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            html2canvas:  { scale: 2, useCORS: true, windowWidth: document.body.scrollWidth }, 
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+            // Legacy mode correctly parses .html2pdf__page-break
+            pagebreak:    { mode: ['css', 'legacy'] } 
         };
 
         setTimeout(() => {
             html2pdf().set(opt).from(element).save().then(() => {
-                element.style.width = originalWidth; // Restore width
                 btn.innerText = "Download Report as PDF"; 
                 btn.disabled = false;
             }).catch(err => {
                 console.error(err);
                 alert("Error generating PDF!");
-                element.style.width = originalWidth;
                 btn.innerText = "Download Report as PDF"; 
                 btn.disabled = false;
             });
