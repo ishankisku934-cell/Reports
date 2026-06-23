@@ -21,21 +21,18 @@
             --dark-player: #0f172a;
         }
         
-        html, body { 
-            overscroll-behavior-y: none; /* Disable pull-to-refresh */
+        /* Fixed Scrolling Issue on Mobile */
+        body { 
+            overscroll-behavior-y: contain; /* Prevents pull-to-refresh without locking scroll */
             font-family: 'Segoe UI', sans-serif; 
             background-color: var(--bg); 
             color: var(--text); 
             margin: 0; 
-            padding: 10px; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center;
-            width: 100%;
-            overflow-x: hidden; /* Prevents horizontal scroll */
+            padding: 15px 10px; 
+            overflow-x: hidden; 
         }
         
-        .container { max-width: 900px; width: 100%; background: var(--card-bg); padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+        .container { max-width: 900px; width: 100%; background: var(--card-bg); padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); margin: 0 auto; }
         .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
         .clock-box { background: #1e293b; color: #10b981; padding: 8px 15px; border-radius: 6px; font-family: monospace; font-size: 1.2rem; font-weight: bold; }
         
@@ -43,8 +40,8 @@
         .refresh-btn:hover { background: #dc2626; }
         .header-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 
-        .input-group { display: flex; gap: 10px; margin-bottom: 15px; width: 100%; }
-        input[type="text"] { flex: 1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 1rem; width: 100%; }
+        .input-group { display: flex; gap: 10px; margin-bottom: 15px; width: 100%; flex-wrap: wrap; }
+        input[type="text"] { flex: 1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 1rem; min-width: 200px; }
         .btn-primary { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 1rem; font-weight: bold; transition: 0.2s; white-space: nowrap; }
         .btn-primary:hover { background: #1d4ed8; }
         
@@ -77,12 +74,14 @@
         #custom-controls { position: absolute; bottom: 0; left: 0; width: 100%; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 12px; background: rgba(15, 23, 42, 0.85); padding: 15px 20px; color: white; flex-wrap: wrap; z-index: 40; transition: opacity 0.4s ease, transform 0.4s ease; }
         #custom-controls.hidden { opacity: 0; pointer-events: none; transform: translateY(10px); }
 
-        .control-group { display: flex; align-items: center; gap: 10px; }
+        .control-group { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
         .control-btn { background: #334155; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; }
         .control-btn:hover { background: #475569; }
         .time-display { font-family: monospace; font-size: 0.95rem; white-space: nowrap; color: #cbd5e1; }
         #progress-bar { flex-grow: 1; cursor: pointer; height: 6px; border-radius: 5px; accent-color: var(--primary); min-width: 100px; }
         .speed-slider { width: 70px; cursor: pointer; accent-color: #10b981; }
+        
+        select.control-btn { padding: 6px; font-size: 0.85rem; appearance: none; outline: none; }
 
         .report-btn { background: #dc2626; width: 100%; margin-top: 15px; padding: 15px; display: none; }
         .report-btn:hover { background: #b91c1c; }
@@ -94,13 +93,8 @@
         
         .session-report-block { padding: 20px; border: 2px solid #e2e8f0; border-radius: 8px; margin-bottom: 30px; background: #ffffff; width: 100%; box-sizing: border-box; overflow: hidden; }
         
-        /* PDF Page Break Classes for Clean Slicing */
-        .page-break-after { page-break-after: always; }
-        .page-break-before { page-break-before: always; }
-        .no-break { page-break-inside: avoid; }
-        
         .report-header { display: flex; justify-content: center; align-items: center; border-bottom: 2px dashed #cbd5e1; padding-bottom: 15px; margin-bottom: 20px; }
-        .summary-box { background: #f1f5f9; padding: 15px; border-radius: 6px; font-weight: bold; line-height: 1.6; text-align: left; max-width: 500px; margin: 0 auto; }
+        .summary-box { background: #f1f5f9; padding: 15px; border-radius: 6px; font-weight: bold; line-height: 1.6; text-align: left; max-width: 500px; margin: 0 auto 30px auto; }
         
         .qr-wrapper { text-align: center; margin: 0 auto 30px auto; }
         .qr-wrapper p { margin: 10px 0 0 0; font-size: 1rem; color: #64748b; font-weight: bold; }
@@ -113,9 +107,8 @@
         @media (max-width: 600px) {
             .chart-container { height: 250px; }
             #custom-controls { padding: 10px; }
-            .control-group { gap: 5px; }
+            .control-group { gap: 8px; justify-content: center; width: 100%; }
             #progress-bar { width: 100%; order: -1; margin-bottom: 5px; } 
-            .input-group { flex-direction: column; }
         }
     </style>
 </head>
@@ -151,11 +144,27 @@
                 <button id="play-pause-btn" class="control-btn" onclick="togglePlayPause()">▶ Play</button>
                 <span id="time-display" class="time-display">0:00 / 0:00</span>
             </div>
+            
             <input type="range" id="progress-bar" min="0" max="100" value="0" step="0.1" oninput="draggingTimeline()" onchange="seekVideo()">
+            
             <div class="control-group">
-                <label style="font-size: 0.85rem;">Speed: <span id="speed-display">1.0x</span></label>
+                <label style="font-size: 0.85rem;">Quality:</label>
+                <select id="quality-select" class="control-btn" onchange="changeQuality()">
+                    <option value="default">Auto</option>
+                    <option value="tiny">144p</option>
+                    <option value="small">240p</option>
+                    <option value="medium">360p</option>
+                    <option value="large">480p</option>
+                    <option value="hd720">720p</option>
+                    <option value="hd1080">1080p</option>
+                    <option value="hd1440">2K</option>
+                    <option value="highres">4K</option>
+                </select>
+
+                <label style="font-size: 0.85rem; margin-left: 5px;">Speed: <span id="speed-display">1.0x</span></label>
                 <input type="range" id="speed-slider" class="speed-slider" min="0.5" max="3" step="0.25" value="1" oninput="changeSpeed()">
-                <button onclick="toggleFullScreen()" class="control-btn" style="background: #10b981;">⛶ Full Screen</button>
+                
+                <button onclick="toggleFullScreen()" class="control-btn" style="background: #10b981;">⛶ Full</button>
             </div>
         </div>
     </div>
@@ -256,6 +265,7 @@
         isFirstPlay = true; isDraggingTimeline = false;
         
         document.getElementById('speed-slider').value = 1; document.getElementById('speed-display').innerText = "1.0x";
+        document.getElementById('quality-select').value = "default";
         document.getElementById('progress-bar').value = 0;
         document.getElementById('big-play-btn').style.display = "block"; 
         
@@ -269,7 +279,12 @@
         player = new YT.Player('player', {
             videoId: videoId, host: 'https://www.youtube.com',
             playerVars: { 'controls': 0, 'disablekb': 1, 'rel': 0, 'modestbranding': 1, 'playsinline': 1, 'origin': currentOrigin, 'enablejsapi': 1 },
-            events: { 'onStateChange': onPlayerStateChange, 'onPlaybackRateChange': onPlaybackRateChange, 'onReady': () => { setInterval(updateCustomUI, 500); } }
+            events: { 
+                'onStateChange': onPlayerStateChange, 
+                'onPlaybackRateChange': onPlaybackRateChange, 
+                'onPlaybackQualityChange': onPlaybackQualityChange,
+                'onReady': () => { setInterval(updateCustomUI, 500); } 
+            }
         });
         clearInterval(trackingInterval); trackingInterval = setInterval(trackRealtimeData, 1000);
     }
@@ -317,9 +332,25 @@
         const current = player.getCurrentTime(), duration = player.getDuration();
         if (duration > 0) { document.getElementById('progress-bar').value = (current / duration) * 100; document.getElementById('time-display').innerText = `${formatTimeSec(current)} / ${formatTimeSec(duration)}`; }
     }
+    
     function draggingTimeline() { isDraggingTimeline = true; showControls(); if (!player || !player.getDuration) return; document.getElementById('time-display').innerText = `${formatTimeSec((document.getElementById('progress-bar').value / 100) * player.getDuration())} / ${formatTimeSec(player.getDuration())}`; }
     function seekVideo() { if (!player || !player.getDuration) return; player.seekTo((document.getElementById('progress-bar').value / 100) * player.getDuration(), true); isDraggingTimeline = false; }
+    
     function changeSpeed() { const s = document.getElementById('speed-slider').value; document.getElementById('speed-display').innerText = s + "x"; if (player) player.setPlaybackRate(parseFloat(s)); showControls(); }
+    
+    // Video Quality Control Logic
+    function changeQuality() {
+        const q = document.getElementById('quality-select').value;
+        if (player && typeof player.setPlaybackQuality === 'function') {
+            player.setPlaybackQuality(q);
+        }
+        showControls();
+    }
+    function onPlaybackQualityChange(event) {
+        const select = document.getElementById('quality-select');
+        if (select.querySelector(`option[value="${event.data}"]`)) { select.value = event.data; }
+    }
+
     function toggleFullScreen() {
         const w = document.getElementById('video-wrapper');
         if (!document.fullscreenElement && !document.webkitFullscreenElement) { if (w.requestFullscreen) w.requestFullscreen(); else if (w.webkitRequestFullscreen) w.webkitRequestFullscreen(); } 
@@ -360,20 +391,18 @@
         let logsHTML = ""; 
         activityLogs.forEach(l => { 
             let col = l.action === "Play" ? "green" : l.action === "Pause" ? "red" : l.action === "Seek/Drag" ? "orange" : "blue";
-            // Important: added 'no-break' so a log line is never sliced in half across pages!
-            logsHTML += `<div class="log-item no-break"><span>[${l.realTime}]</span> | Video Time: <span>${l.videoTime}</span> | <span style="color:${col};">${l.action}</span> - ${l.details}</div>`; 
+            // Important: added inline page-break-inside avoid
+            logsHTML += `<div class="log-item" style="page-break-inside: avoid;"><span>[${l.realTime}]</span> | Video Time: <span>${l.videoTime}</span> | <span style="color:${col};">${l.action}</span> - ${l.details}</div>`; 
         });
 
-        // Strict Page Break Structure for PDF
+        // Strict HTML2PDF Page Break Structure
         const reportTemplate = `
             <div id="session-report-${sessionId}" class="session-report-block">
                 
-                <div class="page-break-after" style="text-align: center; padding-top: 20px;">
-                    <div class="report-header">
-                        <h2 style="margin-top:0; color:#1e293b;">Official Watch Report (Session ${reportCounter})</h2>
-                    </div>
+                <div style="text-align: center;">
+                    <h2 style="margin-top:0; color:#1e293b; border-bottom: 2px dashed #cbd5e1; padding-bottom: 10px;">Official Watch Report (Session ${reportCounter})</h2>
                     
-                    <h4 style="margin-bottom: 20px; color:#1e293b;">Authentication Signature</h4>
+                    <h4 style="margin: 20px 0; color:#1e293b;">Authentication Signature</h4>
                     <div class="qr-wrapper">
                         <div id="qr-${sessionId}" style="display: flex; justify-content: center;"></div>
                         <p>Auth Signature</p>
@@ -387,12 +416,16 @@
                     </div>
                 </div>
 
-                <div class="page-break-after no-break" style="padding-top: 20px;">
+                <div class="html2pdf__page-break"></div>
+
+                <div style="padding-top: 20px;">
                     <h4 style="margin-bottom:10px;">Timeline Graph (Real-time vs. Video Time):</h4>
-                    <div class="chart-container">
+                    <div class="chart-container" style="page-break-inside: avoid;">
                         <canvas id="graph-${sessionId}"></canvas>
                     </div>
                 </div>
+
+                <div class="html2pdf__page-break"></div>
 
                 <div style="padding-top: 20px;">
                     <h4 style="margin-bottom:10px;">Detailed Tracking Logs:</h4>
@@ -425,11 +458,10 @@
         const hashedData = btoa(encodeURIComponent(rawData)).substring(0, 50);
         const authSignature = `AUTH_YT_${Math.floor(Math.random() * 999999)}_${hashedData}`;
         
-        // Render QR in a hidden div first
         const tempDiv = document.createElement("div");
         new QRCode(tempDiv, { text: authSignature, width: 220, height: 220, colorDark: "#0f172a", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.H });
 
-        // CRITICAL FIX: Extract image immediately so PDF ALWAYS sees an image, not a canvas
+        // Force conversion to pure image so PDF never skips it
         setTimeout(() => {
             const canvas = tempDiv.querySelector('canvas');
             if (canvas) {
@@ -452,24 +484,27 @@
 
         const element = document.getElementById('printable-report');
 
+        // Prevent layout squishing by forcing a desktop-like width before print
+        const originalWidth = element.style.width;
+        element.style.width = '800px';
+
         const opt = {
-            margin:       [10, 10, 10, 10], // Margins
+            margin:       10, // Universal 10mm margin
             filename:     `Video_Audit_Report_${new Date().getTime()}.pdf`,
             image:        { type: 'jpeg', quality: 1.0 },
-            // Force rendering window width to 800px so mobile screens don't squash the PDF layout
             html2canvas:  { scale: 2, useCORS: true, windowWidth: 800 }, 
-            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-            pagebreak:    { mode: ['css', 'legacy'] } 
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
 
-        // Needs a tiny timeout to ensure DOM is perfectly ready
         setTimeout(() => {
             html2pdf().set(opt).from(element).save().then(() => {
+                element.style.width = originalWidth; // Restore width
                 btn.innerText = "Download Report as PDF"; 
                 btn.disabled = false;
             }).catch(err => {
                 console.error(err);
                 alert("Error generating PDF!");
+                element.style.width = originalWidth;
                 btn.innerText = "Download Report as PDF"; 
                 btn.disabled = false;
             });
