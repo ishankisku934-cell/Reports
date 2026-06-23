@@ -54,44 +54,57 @@
             box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.3);
             position: relative;
         }
+        
+        #player-container {
+            position: relative;
+            width: 100%;
+            padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
+            background: #000;
+        }
+        
         /* Fullscreen handling */
-        #video-wrapper:fullscreen { border-radius: 0; display: flex; flex-direction: column; justify-content: center; height: 100vh; }
-        #video-wrapper:-webkit-full-screen { border-radius: 0; display: flex; flex-direction: column; justify-content: center; height: 100vh; width: 100vw; }
+        #video-wrapper:fullscreen { border-radius: 0; width: 100vw !important; height: 100vh !important; display: flex; flex-direction: column; background: #000; }
+        #video-wrapper:fullscreen #player-container { padding-bottom: 0; flex-grow: 1; height: calc(100vh - 70px); }
         
-        #player-container { position: relative; width: 100%; padding-bottom: 56.25%; flex-grow: 1; }
-        #video-wrapper:fullscreen #player-container { padding-bottom: 0; }
-        #video-wrapper:-webkit-full-screen #player-container { padding-bottom: 0; }
+        #video-wrapper:-webkit-full-screen { border-radius: 0; width: 100vw !important; height: 100vh !important; display: flex; flex-direction: column; background: #000; }
+        #video-wrapper:-webkit-full-screen #player-container { padding-bottom: 0; flex-grow: 1; height: calc(100vh - 70px); }
         
-        /* Disable all pointer events on the iframe to physically block YouTube UI clicks */
+        /* Completely disable interactions on YouTube iframe to stop redirects */
         #player { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; pointer-events: none; }
         
-        /* Invisible shield covering the entire video to handle custom clicks */
-        #video-shield { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 50; cursor: pointer; }
+        /* Glass panel captures all clicks for our custom logic */
+        .glass-panel { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; cursor: pointer; }
         
+        /* Big Initial Play Button */
+        #big-play-btn {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(37, 99, 235, 0.9); color: white; border: none;
+            font-size: 1.5rem; font-weight: bold; padding: 20px 40px; border-radius: 50px;
+            cursor: pointer; z-index: 20; display: none; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            transition: 0.2s;
+        }
+        #big-play-btn:hover { background: #1d4ed8; transform: translate(-50%, -50%) scale(1.05); }
+
         .skip-feedback {
             position: absolute; top: 50%; transform: translate(-50%, -50%);
             background: rgba(0, 0, 0, 0.75); color: white; padding: 15px 25px;
             border-radius: 30px; font-size: 1.5rem; font-weight: bold;
-            pointer-events: none; opacity: 0; transition: opacity 0.3s ease; z-index: 60;
+            pointer-events: none; opacity: 0; transition: opacity 0.3s ease; z-index: 30;
         }
         .skip-feedback.show { opacity: 1; }
 
         /* ---------------- Custom Control Bar ---------------- */
         .custom-controls {
             display: flex; align-items: center; justify-content: space-between; gap: 12px;
-            background: #0f172a; padding: 12px 15px; color: white; flex-wrap: wrap; z-index: 60;
+            background: #0f172a; padding: 12px 15px; color: white; flex-wrap: wrap;
+            border-top: 1px solid #1e293b;
         }
         .control-group { display: flex; align-items: center; gap: 10px; }
-        .control-btn {
-            background: #334155; color: white; border: none; padding: 8px 12px;
-            border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s;
-        }
+        .control-btn { background: #334155; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; }
         .control-btn:hover { background: #475569; }
         .time-display { font-family: monospace; font-size: 0.95rem; white-space: nowrap; color: #cbd5e1; }
         
-        /* Custom Progress Bar */
         #progress-bar { flex-grow: 1; cursor: pointer; height: 6px; border-radius: 5px; accent-color: var(--primary); min-width: 100px; }
-        /* Custom Speed Slider */
         .speed-slider { width: 70px; cursor: pointer; accent-color: #10b981; }
 
         .report-btn { background: #dc2626; width: 100%; margin-top: 15px; padding: 15px; display: none; }
@@ -113,7 +126,7 @@
             .report-header { flex-direction: column; align-items: center; gap: 15px; text-align: center; }
             .chart-container { height: 250px; }
             .custom-controls { justify-content: center; }
-            #progress-bar { width: 100%; order: -1; margin-bottom: 5px; } /* Moves progress bar to top on mobile */
+            #progress-bar { width: 100%; order: -1; margin-bottom: 5px; } 
         }
     </style>
 </head>
@@ -127,20 +140,23 @@
 
     <div class="input-group">
         <input type="text" id="video-url" placeholder="Enter YouTube Video URL here...">
-        <button class="btn-primary" onclick="loadVideo()">Load Video</button>
+        <button class="btn-primary" onclick="initVideoLoad()">Load Video</button>
     </div>
 
-    <!-- Complete Custom Player Wrapper -->
     <div id="video-wrapper">
         <div id="player-container">
-            <!-- Invisible Shield to capture all clicks and BLOCK YouTube UI -->
-            <div id="video-shield" onclick="handleVideoClick(event)"></div>
-            <div id="skip-feedback" class="skip-feedback"></div>
+            <!-- IMPORTANT: Using div instead of iframe to prevent API crashes -->
+            <div id="player"></div>
             
-            <iframe id="player" allow="autoplay; fullscreen"></iframe>
+            <!-- Glass Panel to catch all clicks safely -->
+            <div class="glass-panel" onclick="handleVideoClick(event)"></div>
+            
+            <!-- Big Play Button to bypass browser auto-play blocks -->
+            <button id="big-play-btn" onclick="startInitialPlayback(event)">▶ Start Video</button>
+            
+            <div id="skip-feedback" class="skip-feedback"></div>
         </div>
         
-        <!-- Custom Control Panel -->
         <div class="custom-controls">
             <div class="control-group">
                 <button id="play-pause-btn" class="control-btn" onclick="togglePlayPause()">▶ Play</button>
@@ -160,7 +176,6 @@
 
     <button id="generate-report-btn" class="btn-primary report-btn" onclick="generateReport()">End Session & Generate Report</button>
     
-    <!-- Printable Area for Download -->
     <div id="report-wrapper" style="display:none;">
         <div id="printable-report">
             <div class="report-header">
@@ -187,7 +202,7 @@
 </div>
 
 <script>
-    // 1. Clock Setup (IST)
+    // 1. Clock Setup
     function updateClock() {
         const now = new Date();
         document.getElementById('ist-clock').innerText = now.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true });
@@ -209,8 +224,9 @@
     let seekCount = 0;
     let currentSpeed = 1;
     let isDraggingTimeline = false;
+    let isFirstPlay = true;
 
-    // Load YT API
+    // Load YT API safely
     const tag = document.createElement('script');
     tag.src = "https://www.youtube.com/iframe_api";
     const firstScriptTag = document.getElementsByTagName('script')[0];
@@ -221,8 +237,8 @@
         return (match && match[2].length === 11) ? match[2] : null;
     }
 
-    // 3. Load Video & Initialize Custom Player
-    function loadVideo() {
+    // 3. Initialization
+    function initVideoLoad() {
         const videoId = extractVideoID(document.getElementById('video-url').value);
         if (!videoId) return alert("Please enter a valid YouTube link!");
 
@@ -230,6 +246,7 @@
         document.getElementById('generate-report-btn').style.display = "block";
         document.getElementById('report-wrapper').style.display = "none";
         
+        // Reset Variables
         activityLogs = [];
         graphData = [];
         sessionStartTime = new Date();
@@ -239,10 +256,12 @@
         currentSpeed = 1;
         lastVideoTime = 0;
         isDraggingTimeline = false;
+        isFirstPlay = true;
         
         document.getElementById('speed-slider').value = 1;
         document.getElementById('speed-display').innerText = "1.0x";
         document.getElementById('progress-bar').value = 0;
+        document.getElementById('big-play-btn').style.display = "block"; // Show Big Button
         
         logActivity("System", "Video session started", 0);
 
@@ -251,60 +270,69 @@
             currentOrigin = "https://www.youtube.com"; 
         }
 
-        if (player && typeof player.loadVideoById === 'function') {
-            player.loadVideoById(videoId);
-        } else {
-            player = new YT.Player('player', {
-                videoId: videoId,
-                host: 'https://www.youtube.com',
-                playerVars: { 
-                    'controls': 0,          // COMPLETELY hides YouTube native controls
-                    'disablekb': 1,         // Disables keyboard shortcuts on YouTube player
-                    'rel': 0,               
-                    'modestbranding': 1, 
-                    'iv_load_policy': 3,    // Hides annotations
-                    'origin': currentOrigin, 
-                    'enablejsapi': 1
-                },
-                events: {
-                    'onStateChange': onPlayerStateChange,
-                    'onPlaybackRateChange': onPlaybackRateChange,
-                    'onReady': () => { setInterval(updateCustomUI, 500); } // Sync progress bar
-                }
-            });
+        // Destroy existing player if any to prevent iframe conflicts
+        if (player && typeof player.destroy === 'function') {
+            player.destroy();
         }
+
+        // Recreate the div for the API to hook into
+        document.getElementById('player-container').insertAdjacentHTML('afterbegin', '<div id="player"></div>');
+
+        player = new YT.Player('player', {
+            videoId: videoId,
+            host: 'https://www.youtube.com',
+            playerVars: { 
+                'controls': 0,          // Removes all YouTube controls
+                'disablekb': 1,         // Removes keyboard shortcuts
+                'rel': 0,               // No related videos
+                'modestbranding': 1,    // Hides YT logo
+                'playsinline': 1,       // CRUCIAL FOR MOBILE! Stops native fullscreen takeover.
+                'origin': currentOrigin, 
+                'enablejsapi': 1
+            },
+            events: {
+                'onStateChange': onPlayerStateChange,
+                'onPlaybackRateChange': onPlaybackRateChange,
+                'onReady': () => { setInterval(updateCustomUI, 500); }
+            }
+        });
 
         clearInterval(trackingInterval);
         trackingInterval = setInterval(trackRealtimeData, 1000);
     }
 
-    // 4. Custom Video Click Handler (Single Click = Play/Pause | Double Click = Skip 10s)
+    // 4. Custom Interaction Logic
+    function startInitialPlayback(event) {
+        event.stopPropagation(); // Stop click from hitting the glass panel
+        document.getElementById('big-play-btn').style.display = "none";
+        if (player && typeof player.playVideo === 'function') {
+            player.playVideo();
+            isFirstPlay = false;
+        }
+    }
+
     let clickTimer = null;
     function handleVideoClick(event) {
-        if (!player || typeof player.getCurrentTime !== 'function') return;
+        if (isFirstPlay || !player || typeof player.getCurrentTime !== 'function') return;
 
+        const rect = event.target.getBoundingClientRect();
+        const clickX = event.clientX - rect.left;
+        
         if (clickTimer) {
             clearTimeout(clickTimer);
             clickTimer = null;
-            
-            // Double Click Detected
-            const rect = document.getElementById('video-shield').getBoundingClientRect();
-            const clickX = event.clientX - rect.left;
-            const width = rect.width;
-            
-            if (clickX < width * 0.4) {
-                skipTime(-10); // Clicked Left Side
-            } else if (clickX > width * 0.6) {
-                skipTime(10); // Clicked Right Side
-            } else {
-                toggleFullScreen(); // Clicked Center
+            // Double Click detected
+            if (clickX < rect.width * 0.4) {
+                skipTime(-10); // Left side
+            } else if (clickX > rect.width * 0.6) {
+                skipTime(10); // Right side
             }
         } else {
-            // Wait to see if it's a single or double click
+            // Single Click detected
             clickTimer = setTimeout(() => {
                 clickTimer = null;
-                togglePlayPause(); // Single Click Detected
-            }, 250); 
+                togglePlayPause();
+            }, 250);
         }
     }
 
@@ -322,7 +350,7 @@
         const newTime = player.getCurrentTime() + seconds;
         player.seekTo(newTime, true);
         
-        // Show Visual Feedback Text
+        // Visual Feedback
         const feedback = document.getElementById('skip-feedback');
         feedback.innerText = seconds > 0 ? ">> 10s" : "<< 10s";
         feedback.style.left = seconds > 0 ? "75%" : "25%";
@@ -330,7 +358,7 @@
         setTimeout(() => feedback.classList.remove('show'), 400);
     }
 
-    // 5. Custom Controls Logic (Timeline & Speed)
+    // 5. Controls Logic
     function formatTimeSec(seconds) {
         if (isNaN(seconds)) return "0:00";
         const m = Math.floor(seconds / 60);
@@ -375,15 +403,16 @@
 
     function toggleFullScreen() {
         const wrapper = document.getElementById('video-wrapper');
-        if (!document.fullscreenElement) {
+        if (!document.fullscreenElement && !document.webkitFullscreenElement) {
             if (wrapper.requestFullscreen) { wrapper.requestFullscreen(); }
-            else if (wrapper.webkitRequestFullscreen) { wrapper.webkitRequestFullscreen(); } 
+            else if (wrapper.webkitRequestFullscreen) { wrapper.webkitRequestFullscreen(); } // Mobile Safari/Chrome
         } else {
             if (document.exitFullscreen) { document.exitFullscreen(); }
+            else if (document.webkitExitFullscreen) { document.webkitExitFullscreen(); }
         }
     }
 
-    // 6. Track Background Data (Graph & Reporting)
+    // 6. Tracking logic
     function trackRealtimeData() {
         if (!player || !player.getCurrentTime) return;
         
@@ -406,7 +435,6 @@
         lastVideoTime = currentVideoTime;
     }
 
-    // 7. Event Listeners
     function onPlayerStateChange(event) {
         const vTime = player.getCurrentTime();
         const btn = document.getElementById('play-pause-btn');
@@ -414,12 +442,12 @@
         if (event.data == YT.PlayerState.PLAYING) {
             isVideoPlaying = true;
             btn.innerHTML = "⏸ Pause";
-            btn.style.background = "#dc2626"; // Red when playing
+            btn.style.background = "#dc2626"; 
             logActivity("Play", "Video started playing", vTime);
         } else if (event.data == YT.PlayerState.PAUSED) {
             isVideoPlaying = false;
             btn.innerHTML = "▶ Play";
-            btn.style.background = "#2563eb"; // Blue when paused
+            btn.style.background = "#334155"; 
             logActivity("Pause", "Video paused", vTime);
         } else if (event.data == YT.PlayerState.ENDED) {
             btn.innerHTML = "↺ Replay";
@@ -427,121 +455,4 @@
     }
 
     function onPlaybackRateChange(event) {
-        currentSpeed = event.data;
-        document.getElementById('speed-slider').value = currentSpeed;
-        document.getElementById('speed-display').innerText = currentSpeed + "x";
-        logActivity("Speed", `Playback speed changed to ${currentSpeed}x`, player.getCurrentTime());
-    }
-
-    function logActivity(action, details, vTimeSec) {
-        const now = new Date();
-        const timeStr = now.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true });
-        activityLogs.push({ realTime: timeStr, videoTime: formatTimeSec(vTimeSec), action, details });
-    }
-
-    // 8. Generate Report
-    function formatDur(ms) {
-        const s = Math.floor(ms / 1000);
-        return `${Math.floor(s / 60)} min ${s % 60} sec`;
-    }
-
-    function generateReport() {
-        if (!sessionStartTime) return;
-        clearInterval(trackingInterval);
-        player.pauseVideo();
-        logActivity("System", "Report generation complete", player.getCurrentTime());
-
-        document.getElementById('video-wrapper').style.display = "none";
-        document.getElementById('generate-report-btn').style.display = "none";
-        document.getElementById('report-wrapper').style.display = "block";
-        document.getElementById('download-btn').style.display = "block";
-
-        if (document.fullscreenElement) { document.exitFullscreen(); }
-
-        document.getElementById('report-summary').innerHTML = `
-            Total Session Time: ${formatDur(new Date() - sessionStartTime)}<br>
-            Total Play Time: <span style="color: green;">${formatDur(totalRealPlayTimeMs)}</span><br>
-            Total Pause Time: <span style="color: red;">${formatDur(totalRealPauseTimeMs)}</span><br>
-            Total Seeks (Drags/Skips): <span style="color: orange;">${seekCount} times</span>
-        `;
-
-        let logsHTML = "";
-        activityLogs.forEach(l => {
-            let col = "black";
-            if(l.action === "Play") col = "green";
-            if(l.action === "Pause") col = "red";
-            if(l.action === "Seek/Drag") col = "orange";
-            if(l.action === "Speed") col = "blue";
-            logsHTML += `<div class="log-item"><span>[${l.realTime}]</span> | Video Time: <span>${l.videoTime}</span> | <span style="color:${col};">${l.action}</span> - ${l.details}</div>`;
-        });
-        document.getElementById('report-logs').innerHTML = logsHTML;
-
-        generateGraph();
-        generateComplexQR();
-    }
-
-    // 9. Graph Generation (Chart.js)
-    let watchChart = null;
-    function generateGraph() {
-        const ctx = document.getElementById('watchGraph').getContext('2d');
-        if(watchChart) watchChart.destroy(); 
-
-        const xData = graphData.map(d => d.x);
-        const yData = graphData.map(d => d.y);
-
-        watchChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: xData,
-                datasets: [{
-                    label: 'Video Timeline Position (sec)',
-                    data: yData,
-                    borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.2)',
-                    borderWidth: 2, pointRadius: 0, tension: 0.1 
-                }]
-            },
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                scales: {
-                    x: { title: { display: true, text: 'Real Time (Seconds spent on website)' } },
-                    y: { title: { display: true, text: 'Video Timeline (Seconds)' } }
-                },
-                plugins: { title: { display: true, text: 'Normal Watch = Straight line. Vertical jumps = Seeking/Dragging.' } }
-            }
-        });
-    }
-
-    // 10. Complex QR Code
-    function generateComplexQR() {
-        document.getElementById("qrcode").innerHTML = ""; 
-        const rawData = `S:${sessionStartTime.getTime()}|PT:${totalRealPlayTimeMs}|PA:${totalRealPauseTimeMs}|SK:${seekCount}|SP:${currentSpeed}`;
-        const hashedData = btoa(encodeURIComponent(rawData)).substring(0, 50); 
-        const authSignature = `AUTH_YT_${Math.floor(Math.random() * 999999)}_${hashedData}`;
-
-        new QRCode(document.getElementById("qrcode"), { text: authSignature, width: 100, height: 100, colorDark: "#0f172a", colorLight: "#ffffff" });
-    }
-
-    // 11. Download as PNG
-    function downloadReportAsPNG() {
-        const reportElement = document.getElementById('printable-report');
-        const btn = document.getElementById('download-btn');
-        btn.innerText = "Preparing... (Please wait)";
-        btn.disabled = true;
-
-        html2canvas(reportElement, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }).then(canvas => {
-            const a = document.createElement('a');
-            a.href = canvas.toDataURL("image/png");
-            a.download = `Video_Audit_Report_${new Date().getTime()}.png`;
-            a.click();
-            btn.innerText = "Download Report as PNG";
-            btn.disabled = false;
-        }).catch(() => {
-            alert("Error generating screenshot!");
-            btn.innerText = "Download Report as PNG";
-            btn.disabled = false;
-        });
-    }
-</script>
-
-</body>
-</html>
+        currentSpeed = event.
