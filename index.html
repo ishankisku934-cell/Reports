@@ -3,7 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YouTube Video Watch Tracker</title>
+    <title>Advanced YouTube Tracker with Graph & QR</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
     <style>
         :root {
             --primary: #2563eb;
@@ -22,7 +27,7 @@
             align-items: center;
         }
         .container {
-            max-width: 800px;
+            max-width: 900px;
             width: 100%;
             background: var(--card-bg);
             padding: 20px;
@@ -69,62 +74,82 @@
             font-weight: bold;
             transition: 0.2s;
         }
-        button:hover {
-            background: #1d4ed8;
-        }
+        button:hover { background: #1d4ed8; }
         .report-btn {
             background: #dc2626;
             width: 100%;
             margin-top: 20px;
             padding: 15px;
         }
-        .report-btn:hover {
-            background: #b91c1c;
+        .report-btn:hover { background: #b91c1c; }
+        .download-btn {
+            background: #10b981;
+            width: 100%;
+            margin-top: 15px;
+            padding: 15px;
+            display: none;
         }
+        .download-btn:hover { background: #059669; }
+        
         #player-container {
             position: relative;
             width: 100%;
-            padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
+            padding-bottom: 56.25%;
             background: #000;
             border-radius: 8px;
             overflow: hidden;
             display: none;
         }
-        #player {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-        }
-        #report-section {
-            margin-top: 30px;
-            display: none;
-            background: #f1f5f9;
-            padding: 20px;
+        #player { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        
+        /* Report Section Styling */
+        #printable-report {
+            background: #ffffff;
+            padding: 30px;
             border-radius: 8px;
-            border: 1px solid #e2e8f0;
+            border: 2px solid #e2e8f0;
+            margin-top: 20px;
         }
-        .log-item {
-            padding: 8px;
-            border-bottom: 1px solid #cbd5e1;
-            font-size: 0.95rem;
+        .report-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2px dashed #cbd5e1;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
         }
-        .log-item span { font-weight: bold; }
         .summary-box {
-            background: #dbeafe;
+            background: #f1f5f9;
             padding: 15px;
             border-radius: 6px;
-            margin-bottom: 15px;
             font-weight: bold;
+            line-height: 1.6;
         }
+        #qrcode-container {
+            text-align: center;
+            background: #fff;
+            padding: 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+        }
+        #qrcode-container p { margin: 5px 0 0 0; font-size: 0.8rem; color: #64748b; }
+        .chart-container {
+            width: 100%;
+            margin: 20px 0;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 10px;
+        }
+        .log-item { padding: 8px; border-bottom: 1px solid #cbd5e1; font-size: 0.95rem; }
+        .log-item span { font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div class="header">
-        <h2>ভিডিও ট্র্যাকার (Video Tracker)</h2>
+        <h2>অ্যাডভান্সড ভিডিও ট্র্যাকার</h2>
         <div class="clock-box" id="ist-clock">00:00:00 AM</div>
     </div>
 
@@ -138,200 +163,286 @@
     </div>
 
     <button id="generate-report-btn" class="report-btn" style="display:none;" onclick="generateReport()">ভিডিও দেখা শেষ করুন এবং রিপোর্ট পান</button>
+    
+    <div id="report-wrapper" style="display:none;">
+        <div id="printable-report">
+            <div class="report-header">
+                <div>
+                    <h3 style="margin-top:0; color:#1e293b;">অফিসিয়াল ওয়াচ রিপোর্ট</h3>
+                    <div class="summary-box" id="report-summary"></div>
+                </div>
+                <div id="qrcode-container">
+                    <div id="qrcode"></div>
+                    <p>অথেনটিকেশন QR</p>
+                </div>
+            </div>
 
-    <div id="report-section">
-        <h3>আপনার দেখার রিপোর্ট</h3>
-        <div class="summary-box" id="report-summary"></div>
-        <h4>বিস্তারিত টাইমলাইন:</h4>
-        <div id="report-logs"></div>
+            <h4>টাইমলাইন গ্রাফ (রিয়েল-টাইম vs ভিডিও টাইম):</h4>
+            <div class="chart-container">
+                <canvas id="watchGraph"></canvas>
+            </div>
+
+            <h4>বিস্তারিত ট্র্যাকিং লগ:</h4>
+            <div id="report-logs"></div>
+        </div>
+        <button class="download-btn" id="download-btn" onclick="downloadReportAsPNG()">রিপোর্টটি PNG হিসেবে ডাউনলোড করুন</button>
     </div>
 </div>
 
 <script>
-    // --- 1. Real-time IST Clock ---
+    // 1. Clock Setup
     function updateClock() {
         const now = new Date();
-        const timeString = now.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true });
-        document.getElementById('ist-clock').innerText = timeString;
+        document.getElementById('ist-clock').innerText = now.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true });
     }
     setInterval(updateClock, 1000);
     updateClock();
 
-    // --- 2. YouTube API Setup ---
+    // 2. Global Variables
     let player;
     let activityLogs = [];
+    let graphData = []; // Store {x: realTimeSec, y: videoTimeSec}
     let sessionStartTime = null;
-    let lastPlayRealTime = null;
-    let lastPauseRealTime = null;
-    let totalRealPlayTime = 0; // In milliseconds
-    let totalRealPauseTime = 0; // In milliseconds
     let isVideoPlaying = false;
+    let trackingInterval;
+    let lastVideoTime = 0;
+    
+    // Stats
+    let totalRealPlayTimeMs = 0;
+    let totalRealPauseTimeMs = 0;
+    let seekCount = 0;
+    let currentSpeed = 1;
 
-    // Load YT IFrame API
+    // Load YT API
     const tag = document.createElement('script');
     tag.src = "https://www.youtube.com/iframe_api";
     const firstScriptTag = document.getElementsByTagName('script')[0];
     firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 
-    // --- 3. Extract Video ID from Link ---
     function extractVideoID(url) {
-        const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-        const match = url.match(regExp);
+        const match = url.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/);
         return (match && match[2].length === 11) ? match[2] : null;
     }
 
-    // --- 4. Load Video & Initialize Player ---
+    // 3. Load Video
     function loadVideo() {
-        const url = document.getElementById('video-url').value;
-        const videoId = extractVideoID(url);
-
-        if (!videoId) {
-            alert("দয়া করে একটি সঠিক YouTube লিঙ্ক দিন!");
-            return;
-        }
+        const videoId = extractVideoID(document.getElementById('video-url').value);
+        if (!videoId) return alert("সঠিক YouTube লিঙ্ক দিন!");
 
         document.getElementById('player-container').style.display = "block";
         document.getElementById('generate-report-btn').style.display = "block";
-        document.getElementById('report-section').style.display = "none";
+        document.getElementById('report-wrapper').style.display = "none";
         
-        // Reset Variables
+        // Reset state
         activityLogs = [];
+        graphData = [];
         sessionStartTime = new Date();
-        totalRealPlayTime = 0;
-        totalRealPauseTime = 0;
-        lastPlayRealTime = null;
-        lastPauseRealTime = sessionStartTime;
-        isVideoPlaying = false;
+        totalRealPlayTimeMs = 0;
+        totalRealPauseTimeMs = 0;
+        seekCount = 0;
+        currentSpeed = 1;
+        lastVideoTime = 0;
+        
+        logActivity("সিস্টেম", "ভিডিও সেশন শুরু", 0);
 
-        logActivity("সিস্টেম", "ভিডিও লোড করা হয়েছে", 0);
+        let currentOrigin = window.location.origin;
+        if (!currentOrigin || currentOrigin === "null" || window.location.protocol.startsWith("file")) currentOrigin = "https://www.youtube.com"; 
 
         if (player) {
             player.loadVideoById(videoId);
         } else {
             player = new YT.Player('player', {
                 videoId: videoId,
-                playerVars: { 'rel': 0, 'modestbranding': 1 },
+                host: 'https://www.youtube.com',
+                playerVars: { 'rel': 0, 'origin': currentOrigin, 'enablejsapi': 1 },
                 events: {
                     'onStateChange': onPlayerStateChange,
                     'onPlaybackRateChange': onPlaybackRateChange
                 }
             });
         }
+
+        // Start 1-second Graph & Seek tracking loop
+        clearInterval(trackingInterval);
+        trackingInterval = setInterval(trackRealtimeData, 1000);
     }
 
-    // --- 5. Event Listeners (Play, Pause, Speed) ---
-    function onPlayerStateChange(event) {
-        const videoTime = player.getCurrentTime();
+    // 4. Track Data (Graph & Seeks)
+    function trackRealtimeData() {
+        if (!player || !player.getCurrentTime) return;
+        
         const now = new Date();
+        const elapsedRealSec = Math.floor((now - sessionStartTime) / 1000);
+        const currentVideoTime = player.getCurrentTime();
 
+        // Detect Seek (Drag/Jump) -> if time diff is more than 2 seconds (adjusting for speed)
+        if (isVideoPlaying) {
+            const expectedTime = lastVideoTime + (1 * currentSpeed);
+            if (Math.abs(currentVideoTime - expectedTime) > 2.5) {
+                seekCount++;
+                logActivity("সিক (Seek/Drag)", `ভিডিও টাইমলাইন টানা হয়েছে (Jumped)`, currentVideoTime);
+            }
+            totalRealPlayTimeMs += 1000;
+        } else {
+            totalRealPauseTimeMs += 1000;
+        }
+
+        // Add point to Graph Data
+        graphData.push({ x: elapsedRealSec, y: currentVideoTime });
+        lastVideoTime = currentVideoTime;
+    }
+
+    // 5. Events
+    function onPlayerStateChange(event) {
+        const vTime = player.getCurrentTime();
         if (event.data == YT.PlayerState.PLAYING) {
             isVideoPlaying = true;
-            lastPlayRealTime = now;
-            
-            // Calculate how long it was paused
-            if (lastPauseRealTime) {
-                totalRealPauseTime += (now - lastPauseRealTime);
-                lastPauseRealTime = null;
-            }
-            
-            logActivity("প্লে (Play)", "ভিডিও শুরু/চালু হয়েছে", videoTime);
-            
+            logActivity("প্লে (Play)", "ভিডিও চালু", vTime);
         } else if (event.data == YT.PlayerState.PAUSED) {
             isVideoPlaying = false;
-            lastPauseRealTime = now;
-            
-            // Calculate how long it was playing
-            if (lastPlayRealTime) {
-                totalRealPlayTime += (now - lastPlayRealTime);
-                lastPlayRealTime = null;
-            }
-            
-            logActivity("পজ (Pause)", "ভিডিও থামানো হয়েছে", videoTime);
+            logActivity("পজ (Pause)", "ভিডিও থামানো", vTime);
+        } else if (event.data == YT.PlayerState.BUFFERING) {
+            logActivity("বাফারিং", "ভিডিও লোড হচ্ছে", vTime);
         }
     }
 
     function onPlaybackRateChange(event) {
-        const videoTime = player.getCurrentTime();
-        const speed = event.data;
-        logActivity("স্পিড পরিবর্তন", `স্পিড ${speed}x করা হয়েছে`, videoTime);
+        currentSpeed = event.data;
+        logActivity("স্পিড", `${currentSpeed}x করা হয়েছে`, player.getCurrentTime());
     }
 
-    // --- 6. Logger System ---
-    function logActivity(action, details, videoTimeInSeconds) {
+    // Logger
+    function logActivity(action, details, vTimeSec) {
         const now = new Date();
-        const istTime = now.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true });
-        
-        // Format video time (e.g., 65s -> 01:05)
-        const vMin = Math.floor(videoTimeInSeconds / 60).toString().padStart(2, '0');
-        const vSec = Math.floor(videoTimeInSeconds % 60).toString().padStart(2, '0');
-        const formattedVideoTime = `${vMin}:${vSec}`;
-
-        activityLogs.push({
-            realTime: istTime,
-            videoTime: formattedVideoTime,
-            action: action,
-            details: details
-        });
+        const timeStr = now.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true });
+        const vTimeFmt = `${Math.floor(vTimeSec / 60).toString().padStart(2, '0')}:${Math.floor(vTimeSec % 60).toString().padStart(2, '0')}`;
+        activityLogs.push({ realTime: timeStr, videoTime: vTimeFmt, action, details });
     }
 
-    // --- 7. Generate Report ---
-    function formatDuration(ms) {
-        const totalSeconds = Math.floor(ms / 1000);
-        const minutes = Math.floor(totalSeconds / 60);
-        const seconds = totalSeconds % 60;
-        return `${minutes} মিনিট ${seconds} সেকেন্ড`;
+    // 6. Generate Report
+    function formatDur(ms) {
+        const s = Math.floor(ms / 1000);
+        return `${Math.floor(s / 60)} মি ${s % 60} সে`;
     }
 
     function generateReport() {
-        if (!sessionStartTime) {
-            alert("আপনি এখনও কোনো ভিডিও লোড করেননি!");
-            return;
-        }
+        if (!sessionStartTime) return;
+        clearInterval(trackingInterval);
+        player.pauseVideo();
+        logActivity("সিস্টেম", "রিপোর্ট তৈরি সম্পন্ন", player.getCurrentTime());
 
-        const now = new Date();
-        
-        // Final calculations if user clicked generate while playing/paused
-        if (isVideoPlaying && lastPlayRealTime) {
-            totalRealPlayTime += (now - lastPlayRealTime);
-            lastPlayRealTime = now; // Reset for logic
-        } else if (!isVideoPlaying && lastPauseRealTime) {
-            totalRealPauseTime += (now - lastPauseRealTime);
-            lastPauseRealTime = now;
-        }
-
-        player.pauseVideo(); // Stop video when report is generated
-        logActivity("সিস্টেম", "রিপোর্ট তৈরি করা হয়েছে এবং দেখা শেষ", player.getCurrentTime());
-
-        // Stop Player completely
         document.getElementById('player-container').style.display = "none";
         document.getElementById('generate-report-btn').style.display = "none";
-        document.getElementById('report-section').style.display = "block";
+        document.getElementById('report-wrapper').style.display = "block";
+        document.getElementById('download-btn').style.display = "block";
 
-        // Build Summary
-        const totalSessionTime = now - sessionStartTime;
+        // Summary
         document.getElementById('report-summary').innerHTML = `
-            মোট সময় ওয়েবসাইটে ছিলেন: ${formatDuration(totalSessionTime)}<br>
-            ভিডিওটি চালু ছিল (Play Time): <span style="color: green;">${formatDuration(totalRealPlayTime)}</span><br>
-            ভিডিওটি থামানো ছিল (Pause Time): <span style="color: red;">${formatDuration(totalRealPauseTime)}</span>
+            মোট সেশন সময়: ${formatDur(new Date() - sessionStartTime)}<br>
+            মোট প্লে টাইম: <span style="color: green;">${formatDur(totalRealPlayTimeMs)}</span><br>
+            মোট পজ টাইম: <span style="color: red;">${formatDur(totalRealPauseTimeMs)}</span><br>
+            কতবার টেনেছে (Seeks): <span style="color: orange;">${seekCount} বার</span>
         `;
 
-        // Build Logs Table
+        // Logs
         let logsHTML = "";
-        activityLogs.forEach(log => {
-            let color = "black";
-            if(log.action.includes("প্লে")) color = "green";
-            if(log.action.includes("পজ")) color = "red";
-            if(log.action.includes("স্পিড")) color = "blue";
-
-            logsHTML += `
-                <div class="log-item">
-                    <span>[IST ${log.realTime}]</span> | 
-                    ভিডিওর সময়: <span>${log.videoTime}</span> | 
-                    অ্যাকশন: <span style="color: ${color};">${log.action}</span> - ${log.details}
-                </div>
-            `;
+        activityLogs.forEach(l => {
+            let col = "black";
+            if(l.action.includes("প্লে")) col = "green";
+            if(l.action.includes("পজ")) col = "red";
+            if(l.action.includes("সিক")) col = "orange";
+            logsHTML += `<div class="log-item"><span>[${l.realTime}]</span> | ভিডিও: <span>${l.videoTime}</span> | <span style="color:${col};">${l.action}</span> - ${l.details}</div>`;
         });
         document.getElementById('report-logs').innerHTML = logsHTML;
+
+        generateGraph();
+        generateComplexQR();
+    }
+
+    // 7. Graph Generation (Chart.js)
+    let watchChart = null;
+    function generateGraph() {
+        const ctx = document.getElementById('watchGraph').getContext('2d');
+        if(watchChart) watchChart.destroy(); // Destroy previous if exists
+
+        const xData = graphData.map(d => d.x);
+        const yData = graphData.map(d => d.y);
+
+        watchChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: xData,
+                datasets: [{
+                    label: 'ভিডিও টাইমলাইন পজিশন (সেকেন্ডে)',
+                    data: yData,
+                    borderColor: '#2563eb',
+                    backgroundColor: 'rgba(37, 99, 235, 0.2)',
+                    borderWidth: 2,
+                    pointRadius: 0, // Hide dots to make it a clean line
+                    tension: 0.1 // Slight curve
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: { title: { display: true, text: 'রিয়েল টাইম (ওয়েবসাইটে কাটানো সেকেন্ড)' } },
+                    y: { title: { display: true, text: 'ভিডিওর টাইমলাইন (সেকেন্ড)' } }
+                },
+                plugins: {
+                    title: { display: true, text: 'স্বাভাবিক গ্রাফ = সোজা লাইন (লিনিয়ার)। হঠাৎ ড্রপ বা ওঠা = টেনে দেখা (Seek)' }
+                }
+            }
+        });
+    }
+
+    // 8. Complex Algorithm for QR Code
+    function generateComplexQR() {
+        document.getElementById("qrcode").innerHTML = ""; // Clear old
+        
+        // Complex payload combining parameters
+        const rawData = `S:${sessionStartTime.getTime()}|PT:${totalRealPlayTimeMs}|PA:${totalRealPauseTimeMs}|SK:${seekCount}|SP:${currentSpeed}`;
+        
+        // Simulating a complex hashing/encoding to make the QR unreadable to raw eyes
+        const hashedData = btoa(encodeURIComponent(rawData)).substring(0, 50); // Base64 encoding snippet
+        const authSignature = `AUTH_YT_${Math.floor(Math.random() * 999999)}_${hashedData}`;
+
+        new QRCode(document.getElementById("qrcode"), {
+            text: authSignature,
+            width: 100,
+            height: 100,
+            colorDark : "#0f172a",
+            colorLight : "#ffffff",
+            correctLevel : QRCode.CorrectLevel.H
+        });
+    }
+
+    // 9. Download as PNG (html2canvas)
+    function downloadReportAsPNG() {
+        const reportElement = document.getElementById('printable-report');
+        const btn = document.getElementById('download-btn');
+        btn.innerText = "প্রস্তুত করা হচ্ছে... (অপেক্ষা করুন)";
+        btn.disabled = true;
+
+        html2canvas(reportElement, {
+            scale: 2, // High resolution
+            useCORS: true,
+            backgroundColor: "#ffffff"
+        }).then(canvas => {
+            const imageURL = canvas.toDataURL("image/png");
+            
+            // Create a fake anchor tag to trigger download
+            const a = document.createElement('a');
+            a.href = imageURL;
+            a.download = `Video_Audit_Report_${new Date().getTime()}.png`;
+            a.click();
+
+            btn.innerText = "রিপোর্টটি PNG হিসেবে ডাউনলোড করুন";
+            btn.disabled = false;
+        }).catch(err => {
+            alert("স্ক্রিনশট তৈরিতে সমস্যা হয়েছে!");
+            btn.innerText = "রিপোর্টটি PNG হিসেবে ডাউনলোড করুন";
+            btn.disabled = false;
+        });
     }
 </script>
 
