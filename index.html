@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="bn">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -54,7 +54,7 @@
         .input-group {
             display: flex;
             gap: 10px;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
         input[type="text"] {
             flex: 1;
@@ -75,122 +75,162 @@
             transition: 0.2s;
         }
         button:hover { background: #1d4ed8; }
-        .report-btn {
-            background: #dc2626;
-            width: 100%;
-            margin-top: 20px;
-            padding: 15px;
+        
+        /* Video Player Controls (Speed & Fullscreen) */
+        .controls-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #1e293b;
+            padding: 12px 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            color: white;
         }
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: bold;
+        }
+        .speed-control input { cursor: pointer; }
+        .fullscreen-btn { background: #10b981; padding: 8px 15px; }
+        .fullscreen-btn:hover { background: #059669; }
+
+        .report-btn { background: #dc2626; width: 100%; margin-top: 10px; padding: 15px; }
         .report-btn:hover { background: #b91c1c; }
-        .download-btn {
-            background: #10b981;
-            width: 100%;
-            margin-top: 15px;
-            padding: 15px;
-            display: none;
-        }
+        .download-btn { background: #10b981; width: 100%; margin-top: 15px; padding: 15px; display: none; }
         .download-btn:hover { background: #059669; }
         
+        /* Player & Fullscreen Styling */
         #player-container {
             position: relative;
             width: 100%;
-            padding-bottom: 56.25%;
+            padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
             background: #000;
             border-radius: 8px;
             overflow: hidden;
             display: none;
         }
-        #player { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        #player-container:fullscreen { padding-bottom: 0; height: 100vh; display: flex; justify-content: center; align-items: center; }
+        #player-container:-webkit-full-screen { padding-bottom: 0; height: 100vh; }
+        #player { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; }
+
+        /* YouTube Redirect Blockers */
+        .blocker { position: absolute; z-index: 10; cursor: not-allowed; background: transparent; }
+        .top-blocker { top: 0; left: 0; width: 100%; height: 65px; }
+        .bottom-blocker { bottom: 0; right: 0; width: 110px; height: 55px; }
+        
+        /* Double-Click Skip Zones */
+        .skip-zone {
+            position: absolute;
+            top: 15%;
+            height: 70%;
+            width: 30%;
+            z-index: 5;
+            cursor: pointer;
+            touch-action: manipulation; /* Prevents mobile double-tap zoom */
+        }
+        .left-skip { left: 0; }
+        .right-skip { right: 0; }
+
+        /* Visual Feedback for 10s Skip */
+        .skip-feedback {
+            position: absolute;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.75);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 30px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            z-index: 20;
+        }
+        .skip-feedback.show { opacity: 1; }
         
         /* Report Section Styling */
-        #printable-report {
-            background: #ffffff;
-            padding: 30px;
-            border-radius: 8px;
-            border: 2px solid #e2e8f0;
-            margin-top: 20px;
-        }
-        .report-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            border-bottom: 2px dashed #cbd5e1;
-            padding-bottom: 15px;
-            margin-bottom: 20px;
-        }
-        .summary-box {
-            background: #f1f5f9;
-            padding: 15px;
-            border-radius: 6px;
-            font-weight: bold;
-            line-height: 1.6;
-        }
-        #qrcode-container {
-            text-align: center;
-            background: #fff;
-            padding: 10px;
-            border: 1px solid #cbd5e1;
-            border-radius: 8px;
-        }
-        #qrcode-container p { margin: 5px 0 0 0; font-size: 0.8rem; color: #64748b; }
-        .chart-container {
-            width: 100%;
-            margin: 20px 0;
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 10px;
-        }
+        #printable-report { background: #ffffff; padding: 30px; border-radius: 8px; border: 2px solid #e2e8f0; margin-top: 20px; }
+        .report-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px dashed #cbd5e1; padding-bottom: 15px; margin-bottom: 20px; }
+        .summary-box { background: #f1f5f9; padding: 15px; border-radius: 6px; font-weight: bold; line-height: 1.6; }
+        #qrcode-container { text-align: center; background: #fff; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; }
+        #qrcode-container p { margin: 5px 0 0 0; font-size: 0.8rem; color: #64748b; font-weight: bold; }
+        
+        .chart-container { position: relative; width: 100%; height: 350px; margin: 20px 0; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; box-sizing: border-box; }
         .log-item { padding: 8px; border-bottom: 1px solid #cbd5e1; font-size: 0.95rem; }
         .log-item span { font-weight: bold; }
+        
+        @media (max-width: 600px) {
+            .report-header { flex-direction: column; align-items: center; gap: 15px; text-align: center; }
+            .controls-bar { flex-direction: column; gap: 15px; }
+            .chart-container { height: 250px; }
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div class="header">
-        <h2>অ্যাডভান্সড ভিডিও ট্র্যাকার</h2>
+        <h2>Advanced Video Tracker</h2>
         <div class="clock-box" id="ist-clock">00:00:00 AM</div>
     </div>
 
     <div class="input-group">
-        <input type="text" id="video-url" placeholder="এখানে YouTube ভিডিওর লিঙ্ক দিন...">
-        <button onclick="loadVideo()">লোড করুন</button>
+        <input type="text" id="video-url" placeholder="Enter YouTube Video URL here...">
+        <button onclick="loadVideo()">Load Video</button>
+    </div>
+
+    <div id="video-controls" class="controls-bar" style="display:none;">
+        <div class="speed-control">
+            <label for="speed-slider">Speed: <span id="speed-display">1.0x</span></label>
+            <input type="range" id="speed-slider" min="0.5" max="3" step="0.25" value="1" oninput="changeSpeed()">
+        </div>
+        <button onclick="toggleFullScreen()" class="fullscreen-btn">⛶ Full Screen</button>
     </div>
 
     <div id="player-container">
-        <div id="player"></div>
+        <div class="blocker top-blocker" title="Redirect is disabled"></div>
+        <div class="blocker bottom-blocker" title="Redirect is disabled"></div>
+        
+        <div class="skip-zone left-skip" ondblclick="skipTime(-10)" title="Double click to go back 10s"></div>
+        <div class="skip-zone right-skip" ondblclick="skipTime(10)" title="Double click to skip 10s"></div>
+        <div id="skip-feedback" class="skip-feedback"></div>
+
+        <iframe id="player" sandbox="allow-scripts allow-same-origin allow-presentation" allow="autoplay; fullscreen"></iframe>
     </div>
 
-    <button id="generate-report-btn" class="report-btn" style="display:none;" onclick="generateReport()">ভিডিও দেখা শেষ করুন এবং রিপোর্ট পান</button>
+    <button id="generate-report-btn" class="report-btn" style="display:none;" onclick="generateReport()">End Session & Generate Report</button>
     
     <div id="report-wrapper" style="display:none;">
         <div id="printable-report">
             <div class="report-header">
                 <div>
-                    <h3 style="margin-top:0; color:#1e293b;">অফিসিয়াল ওয়াচ রিপোর্ট</h3>
+                    <h3 style="margin-top:0; color:#1e293b;">Official Watch Report</h3>
                     <div class="summary-box" id="report-summary"></div>
                 </div>
                 <div id="qrcode-container">
                     <div id="qrcode"></div>
-                    <p>অথেনটিকেশন QR</p>
+                    <p>Auth Signature</p>
                 </div>
             </div>
 
-            <h4>টাইমলাইন গ্রাফ (রিয়েল-টাইম vs ভিডিও টাইম):</h4>
+            <h4>Timeline Graph (Real-time vs. Video Time):</h4>
             <div class="chart-container">
                 <canvas id="watchGraph"></canvas>
             </div>
 
-            <h4>বিস্তারিত ট্র্যাকিং লগ:</h4>
+            <h4>Detailed Tracking Logs:</h4>
             <div id="report-logs"></div>
         </div>
-        <button class="download-btn" id="download-btn" onclick="downloadReportAsPNG()">রিপোর্টটি PNG হিসেবে ডাউনলোড করুন</button>
+        <button class="download-btn" id="download-btn" onclick="downloadReportAsPNG()">Download Report as PNG</button>
     </div>
 </div>
 
 <script>
-    // 1. Clock Setup
+    // 1. Clock Setup (IST)
     function updateClock() {
         const now = new Date();
         document.getElementById('ist-clock').innerText = now.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true });
@@ -201,13 +241,12 @@
     // 2. Global Variables
     let player;
     let activityLogs = [];
-    let graphData = []; // Store {x: realTimeSec, y: videoTimeSec}
+    let graphData = []; 
     let sessionStartTime = null;
     let isVideoPlaying = false;
     let trackingInterval;
     let lastVideoTime = 0;
     
-    // Stats
     let totalRealPlayTimeMs = 0;
     let totalRealPauseTimeMs = 0;
     let seekCount = 0;
@@ -224,12 +263,13 @@
         return (match && match[2].length === 11) ? match[2] : null;
     }
 
-    // 3. Load Video
+    // 3. Load Video & Initialize Player
     function loadVideo() {
         const videoId = extractVideoID(document.getElementById('video-url').value);
-        if (!videoId) return alert("সঠিক YouTube লিঙ্ক দিন!");
+        if (!videoId) return alert("Please enter a valid YouTube link!");
 
         document.getElementById('player-container').style.display = "block";
+        document.getElementById('video-controls').style.display = "flex";
         document.getElementById('generate-report-btn').style.display = "block";
         document.getElementById('report-wrapper').style.display = "none";
         
@@ -242,19 +282,29 @@
         seekCount = 0;
         currentSpeed = 1;
         lastVideoTime = 0;
+        document.getElementById('speed-slider').value = 1;
+        document.getElementById('speed-display').innerText = "1.0x";
         
-        logActivity("সিস্টেম", "ভিডিও সেশন শুরু", 0);
+        logActivity("System", "Video session started", 0);
 
         let currentOrigin = window.location.origin;
-        if (!currentOrigin || currentOrigin === "null" || window.location.protocol.startsWith("file")) currentOrigin = "https://www.youtube.com"; 
+        if (!currentOrigin || currentOrigin === "null" || window.location.protocol.startsWith("file")) {
+            currentOrigin = "https://www.youtube.com"; 
+        }
 
-        if (player) {
+        if (player && typeof player.loadVideoById === 'function') {
             player.loadVideoById(videoId);
         } else {
             player = new YT.Player('player', {
                 videoId: videoId,
                 host: 'https://www.youtube.com',
-                playerVars: { 'rel': 0, 'origin': currentOrigin, 'enablejsapi': 1 },
+                playerVars: { 
+                    'rel': 0, 
+                    'origin': currentOrigin, 
+                    'enablejsapi': 1,
+                    'modestbranding': 1, 
+                    'disablekb': 1 
+                },
                 events: {
                     'onStateChange': onPlayerStateChange,
                     'onPlaybackRateChange': onPlaybackRateChange
@@ -262,12 +312,48 @@
             });
         }
 
-        // Start 1-second Graph & Seek tracking loop
         clearInterval(trackingInterval);
         trackingInterval = setInterval(trackRealtimeData, 1000);
     }
 
-    // 4. Track Data (Graph & Seeks)
+    // 4. Double Click Skip (10 seconds)
+    function skipTime(seconds) {
+        if (!player || typeof player.getCurrentTime !== 'function') return;
+        
+        const newTime = player.getCurrentTime() + seconds;
+        player.seekTo(newTime, true);
+        
+        // Visual Feedback Animation
+        const feedback = document.getElementById('skip-feedback');
+        feedback.innerText = seconds > 0 ? ">> 10s" : "<< 10s";
+        feedback.style.left = seconds > 0 ? "75%" : "25%";
+        
+        feedback.classList.add('show');
+        setTimeout(() => feedback.classList.remove('show'), 400);
+    }
+
+    // 5. Change Playback Speed
+    function changeSpeed() {
+        const speed = document.getElementById('speed-slider').value;
+        document.getElementById('speed-display').innerText = speed + "x";
+        if (player && typeof player.setPlaybackRate === 'function') {
+            player.setPlaybackRate(parseFloat(speed));
+        }
+    }
+
+    // 6. Full Screen Toggle
+    function toggleFullScreen() {
+        const container = document.getElementById('player-container');
+        if (!document.fullscreenElement) {
+            if (container.requestFullscreen) { container.requestFullscreen(); }
+            else if (container.webkitRequestFullscreen) { container.webkitRequestFullscreen(); } // Safari
+            else if (container.msRequestFullscreen) { container.msRequestFullscreen(); } // IE11
+        } else {
+            if (document.exitFullscreen) { document.exitFullscreen(); }
+        }
+    }
+
+    // 7. Track Data (Graph & Seeks)
     function trackRealtimeData() {
         if (!player || !player.getCurrentTime) return;
         
@@ -275,40 +361,40 @@
         const elapsedRealSec = Math.floor((now - sessionStartTime) / 1000);
         const currentVideoTime = player.getCurrentTime();
 
-        // Detect Seek (Drag/Jump) -> if time diff is more than 2 seconds (adjusting for speed)
         if (isVideoPlaying) {
             const expectedTime = lastVideoTime + (1 * currentSpeed);
             if (Math.abs(currentVideoTime - expectedTime) > 2.5) {
                 seekCount++;
-                logActivity("সিক (Seek/Drag)", `ভিডিও টাইমলাইন টানা হয়েছে (Jumped)`, currentVideoTime);
+                logActivity("Seek/Drag", `Video timeline jumped`, currentVideoTime);
             }
             totalRealPlayTimeMs += 1000;
         } else {
             totalRealPauseTimeMs += 1000;
         }
 
-        // Add point to Graph Data
         graphData.push({ x: elapsedRealSec, y: currentVideoTime });
         lastVideoTime = currentVideoTime;
     }
 
-    // 5. Events
+    // 8. Video Events
     function onPlayerStateChange(event) {
         const vTime = player.getCurrentTime();
         if (event.data == YT.PlayerState.PLAYING) {
             isVideoPlaying = true;
-            logActivity("প্লে (Play)", "ভিডিও চালু", vTime);
+            logActivity("Play", "Video started playing", vTime);
         } else if (event.data == YT.PlayerState.PAUSED) {
             isVideoPlaying = false;
-            logActivity("পজ (Pause)", "ভিডিও থামানো", vTime);
+            logActivity("Pause", "Video paused", vTime);
         } else if (event.data == YT.PlayerState.BUFFERING) {
-            logActivity("বাফারিং", "ভিডিও লোড হচ্ছে", vTime);
+            logActivity("Buffering", "Video is loading", vTime);
         }
     }
 
     function onPlaybackRateChange(event) {
         currentSpeed = event.data;
-        logActivity("স্পিড", `${currentSpeed}x করা হয়েছে`, player.getCurrentTime());
+        document.getElementById('speed-slider').value = currentSpeed;
+        document.getElementById('speed-display').innerText = currentSpeed + "x";
+        logActivity("Speed", `Playback speed changed to ${currentSpeed}x`, player.getCurrentTime());
     }
 
     // Logger
@@ -319,39 +405,41 @@
         activityLogs.push({ realTime: timeStr, videoTime: vTimeFmt, action, details });
     }
 
-    // 6. Generate Report
+    // 9. Generate Report
     function formatDur(ms) {
         const s = Math.floor(ms / 1000);
-        return `${Math.floor(s / 60)} মি ${s % 60} সে`;
+        return `${Math.floor(s / 60)} min ${s % 60} sec`;
     }
 
     function generateReport() {
         if (!sessionStartTime) return;
         clearInterval(trackingInterval);
         player.pauseVideo();
-        logActivity("সিস্টেম", "রিপোর্ট তৈরি সম্পন্ন", player.getCurrentTime());
+        logActivity("System", "Report generation complete", player.getCurrentTime());
 
         document.getElementById('player-container').style.display = "none";
+        document.getElementById('video-controls').style.display = "none";
         document.getElementById('generate-report-btn').style.display = "none";
         document.getElementById('report-wrapper').style.display = "block";
         document.getElementById('download-btn').style.display = "block";
 
-        // Summary
+        if (document.fullscreenElement) { document.exitFullscreen(); }
+
         document.getElementById('report-summary').innerHTML = `
-            মোট সেশন সময়: ${formatDur(new Date() - sessionStartTime)}<br>
-            মোট প্লে টাইম: <span style="color: green;">${formatDur(totalRealPlayTimeMs)}</span><br>
-            মোট পজ টাইম: <span style="color: red;">${formatDur(totalRealPauseTimeMs)}</span><br>
-            কতবার টেনেছে (Seeks): <span style="color: orange;">${seekCount} বার</span>
+            Total Session Time: ${formatDur(new Date() - sessionStartTime)}<br>
+            Total Play Time: <span style="color: green;">${formatDur(totalRealPlayTimeMs)}</span><br>
+            Total Pause Time: <span style="color: red;">${formatDur(totalRealPauseTimeMs)}</span><br>
+            Total Seeks (Drags/Skips): <span style="color: orange;">${seekCount} times</span>
         `;
 
-        // Logs
         let logsHTML = "";
         activityLogs.forEach(l => {
             let col = "black";
-            if(l.action.includes("প্লে")) col = "green";
-            if(l.action.includes("পজ")) col = "red";
-            if(l.action.includes("সিক")) col = "orange";
-            logsHTML += `<div class="log-item"><span>[${l.realTime}]</span> | ভিডিও: <span>${l.videoTime}</span> | <span style="color:${col};">${l.action}</span> - ${l.details}</div>`;
+            if(l.action === "Play") col = "green";
+            if(l.action === "Pause") col = "red";
+            if(l.action === "Seek/Drag") col = "orange";
+            if(l.action === "Speed") col = "blue";
+            logsHTML += `<div class="log-item"><span>[${l.realTime}]</span> | Video Time: <span>${l.videoTime}</span> | <span style="color:${col};">${l.action}</span> - ${l.details}</div>`;
         });
         document.getElementById('report-logs').innerHTML = logsHTML;
 
@@ -359,11 +447,11 @@
         generateComplexQR();
     }
 
-    // 7. Graph Generation (Chart.js)
+    // 10. Graph Generation (Chart.js)
     let watchChart = null;
     function generateGraph() {
         const ctx = document.getElementById('watchGraph').getContext('2d');
-        if(watchChart) watchChart.destroy(); // Destroy previous if exists
+        if(watchChart) watchChart.destroy(); 
 
         const xData = graphData.map(d => d.x);
         const yData = graphData.map(d => d.y);
@@ -373,37 +461,34 @@
             data: {
                 labels: xData,
                 datasets: [{
-                    label: 'ভিডিও টাইমলাইন পজিশন (সেকেন্ডে)',
+                    label: 'Video Timeline Position (sec)',
                     data: yData,
                     borderColor: '#2563eb',
                     backgroundColor: 'rgba(37, 99, 235, 0.2)',
                     borderWidth: 2,
-                    pointRadius: 0, // Hide dots to make it a clean line
-                    tension: 0.1 // Slight curve
+                    pointRadius: 0, 
+                    tension: 0.1 
                 }]
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
                 scales: {
-                    x: { title: { display: true, text: 'রিয়েল টাইম (ওয়েবসাইটে কাটানো সেকেন্ড)' } },
-                    y: { title: { display: true, text: 'ভিডিওর টাইমলাইন (সেকেন্ড)' } }
+                    x: { title: { display: true, text: 'Real Time (Seconds spent on website)' } },
+                    y: { title: { display: true, text: 'Video Timeline (Seconds)' } }
                 },
                 plugins: {
-                    title: { display: true, text: 'স্বাভাবিক গ্রাফ = সোজা লাইন (লিনিয়ার)। হঠাৎ ড্রপ বা ওঠা = টেনে দেখা (Seek)' }
+                    title: { display: true, text: 'Normal Watch = Straight line. Vertical jumps = Seeking/Dragging.' }
                 }
             }
         });
     }
 
-    // 8. Complex Algorithm for QR Code
+    // 11. Complex Algorithm for QR Code
     function generateComplexQR() {
-        document.getElementById("qrcode").innerHTML = ""; // Clear old
-        
-        // Complex payload combining parameters
+        document.getElementById("qrcode").innerHTML = ""; 
         const rawData = `S:${sessionStartTime.getTime()}|PT:${totalRealPlayTimeMs}|PA:${totalRealPauseTimeMs}|SK:${seekCount}|SP:${currentSpeed}`;
-        
-        // Simulating a complex hashing/encoding to make the QR unreadable to raw eyes
-        const hashedData = btoa(encodeURIComponent(rawData)).substring(0, 50); // Base64 encoding snippet
+        const hashedData = btoa(encodeURIComponent(rawData)).substring(0, 50); 
         const authSignature = `AUTH_YT_${Math.floor(Math.random() * 999999)}_${hashedData}`;
 
         new QRCode(document.getElementById("qrcode"), {
@@ -416,31 +501,29 @@
         });
     }
 
-    // 9. Download as PNG (html2canvas)
+    // 12. Download as PNG (html2canvas)
     function downloadReportAsPNG() {
         const reportElement = document.getElementById('printable-report');
         const btn = document.getElementById('download-btn');
-        btn.innerText = "প্রস্তুত করা হচ্ছে... (অপেক্ষা করুন)";
+        btn.innerText = "Preparing... (Please wait)";
         btn.disabled = true;
 
         html2canvas(reportElement, {
-            scale: 2, // High resolution
+            scale: 2, 
             useCORS: true,
             backgroundColor: "#ffffff"
         }).then(canvas => {
             const imageURL = canvas.toDataURL("image/png");
-            
-            // Create a fake anchor tag to trigger download
             const a = document.createElement('a');
             a.href = imageURL;
             a.download = `Video_Audit_Report_${new Date().getTime()}.png`;
             a.click();
 
-            btn.innerText = "রিপোর্টটি PNG হিসেবে ডাউনলোড করুন";
+            btn.innerText = "Download Report as PNG";
             btn.disabled = false;
         }).catch(err => {
-            alert("স্ক্রিনশট তৈরিতে সমস্যা হয়েছে!");
-            btn.innerText = "রিপোর্টটি PNG হিসেবে ডাউনলোড করুন";
+            alert("Error generating screenshot!");
+            btn.innerText = "Download Report as PNG";
             btn.disabled = false;
         });
     }
