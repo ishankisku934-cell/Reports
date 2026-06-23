@@ -471,7 +471,11 @@
         new Chart(document.getElementById(canvasId).getContext('2d'), { 
             type: 'line', 
             data: { labels: optimizedX, datasets: [{ label: 'Video Timeline Position (sec)', data: optimizedY, borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.2)', borderWidth: 2, pointRadius: 0, tension: 0.1 }] }, 
-            options: { responsive: true, maintainAspectRatio: false } 
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false,
+                animation: false // CRITICAL FIX: Disable animation so PDF catches the graph instantly
+            } 
         });
     }
 
@@ -507,28 +511,34 @@
 
         const element = document.getElementById('printable-report');
 
-        // Prevent layout squishing by dynamically adjusting styling before print
+        // Prevent layout squishing by forcing a desktop-like width before print
+        const originalWidth = element.style.width;
+        element.style.width = '800px';
+
         const opt = {
             margin:       10, 
             filename:     `Video_Audit_Report_${new Date().getTime()}.pdf`,
             image:        { type: 'jpeg', quality: 1.0 },
-            html2canvas:  { scale: 2, useCORS: true, windowWidth: document.body.scrollWidth }, 
+            html2canvas:  { scale: 2, useCORS: true, windowWidth: 800 }, 
             jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
             // Legacy mode correctly parses .html2pdf__page-break
             pagebreak:    { mode: ['css', 'legacy'] } 
         };
 
+        // Delay added to ensure graph and QR are fully rendered before snapshot
         setTimeout(() => {
             html2pdf().set(opt).from(element).save().then(() => {
+                element.style.width = originalWidth; // Restore width
                 btn.innerText = "Download Report as PDF"; 
                 btn.disabled = false;
             }).catch(err => {
                 console.error(err);
                 alert("Error generating PDF!");
+                element.style.width = originalWidth;
                 btn.innerText = "Download Report as PDF"; 
                 btn.disabled = false;
             });
-        }, 500);
+        }, 1000); // 1 Second Delay for Perfect Print
     }
 </script>
 </body>
