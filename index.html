@@ -44,23 +44,21 @@
         #big-play-btn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(37, 99, 235, 0.9); color: white; border: none; font-size: 1.5rem; font-weight: bold; padding: 20px 40px; border-radius: 50px; cursor: pointer; z-index: 25; box-shadow: 0 4px 15px rgba(0,0,0,0.5); transition: 0.2s; }
         #big-play-btn:hover { background: #1d4ed8; transform: translate(-50%, -50%) scale(1.05); }
 
-        /* Blockers for Title and Logo */
+        /* Blockers */
         .static-blocker { position: absolute; z-index: 10; background: transparent; cursor: default; }
         .blocker-top { top: 0; left: 0; width: 100%; height: 60px; }
         .blocker-bottom { bottom: 0; right: 0; width: 120px; height: 60px; }
 
-        /* Full Dynamic Shield */
+        /* Dynamic Shield */
         #dynamic-shield { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 20; display: none; cursor: pointer; }
         
-        /* Double Tap Skip Feedback */
         .skip-feedback { position: absolute; top: 50%; transform: translate(-50%, -50%); background: rgba(0, 0, 0, 0.75); color: white; padding: 15px 25px; border-radius: 30px; font-size: 1.5rem; font-weight: bold; pointer-events: none; opacity: 0; transition: opacity 0.3s ease; z-index: 30; }
         .skip-feedback.show { opacity: 1; }
 
-        /* Center Play/Pause Flash Icon */
         .center-action-icon { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(1.5); background: rgba(0, 0, 0, 0.7); color: white; width: 70px; height: 70px; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 2rem; pointer-events: none; opacity: 0; transition: opacity 0.2s ease, transform 0.2s ease; z-index: 35; }
         .center-action-icon.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 
-        /* ---------------- Overlay Controls (Auto-hide) ---------------- */
+        /* ---------------- Overlay Controls ---------------- */
         #custom-controls { position: absolute; bottom: 0; left: 0; width: 100%; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 12px; background: rgba(15, 23, 42, 0.85); padding: 15px 20px; color: white; flex-wrap: wrap; z-index: 40; transition: opacity 0.4s ease, transform 0.4s ease; }
         #custom-controls.hidden { opacity: 0; pointer-events: none; transform: translateY(10px); }
 
@@ -78,6 +76,10 @@
         
         /* ---------------- Report Section ---------------- */
         #printable-report { background: #ffffff; padding: 30px; border-radius: 8px; border: 2px solid #e2e8f0; margin-top: 20px; }
+        
+        /* Added spacing between sections specifically for clean PDF slicing */
+        .pdf-section { margin-bottom: 30px; padding-bottom: 20px; }
+        
         .report-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px dashed #cbd5e1; padding-bottom: 15px; margin-bottom: 20px; }
         .summary-box { background: #f1f5f9; padding: 15px; border-radius: 6px; font-weight: bold; line-height: 1.6; }
         #qrcode-container { text-align: center; background: #fff; padding: 15px; border: 1px solid #cbd5e1; border-radius: 8px; }
@@ -113,12 +115,9 @@
     <div id="video-wrapper">
         <div id="player-container">
             <div id="player"></div>
-            
             <div class="static-blocker blocker-top"></div>
             <div class="static-blocker blocker-bottom"></div>
-            
             <div id="dynamic-shield" onclick="handleVideoClick(event)"></div>
-            
             <button id="big-play-btn" onclick="startInitialPlayback(event)">▶ Start Video</button>
             <div id="skip-feedback" class="skip-feedback"></div>
             <div id="center-action-icon" class="center-action-icon"></div>
@@ -142,34 +141,40 @@
     
     <div id="report-wrapper" style="display:none;">
         <div id="printable-report">
-            <div class="report-header">
-                <div>
-                    <h3 style="margin-top:0; color:#1e293b;">Official Watch Report</h3>
-                    <div class="summary-box" id="report-summary"></div>
+            
+            <div id="pdf-section-summary" class="pdf-section">
+                <div class="report-header">
+                    <div>
+                        <h3 style="margin-top:0; color:#1e293b;">Official Watch Report</h3>
+                        <div class="summary-box" id="report-summary"></div>
+                    </div>
+                    <div id="qrcode-container"><div id="qrcode"></div><p>Auth Signature</p></div>
                 </div>
-                <div id="qrcode-container"><div id="qrcode"></div><p>Auth Signature</p></div>
             </div>
-            <h4>Timeline Graph (Real-time vs. Video Time):</h4>
-            <div class="chart-container"><canvas id="watchGraph"></canvas></div>
-            <h4>Detailed Tracking Logs:</h4>
-            <div id="report-logs"></div>
+
+            <div id="pdf-section-graph" class="pdf-section">
+                <h4 style="margin-bottom:10px;">Timeline Graph (Real-time vs. Video Time):</h4>
+                <div class="chart-container"><canvas id="watchGraph"></canvas></div>
+            </div>
+
+            <div id="pdf-section-logs" class="pdf-section">
+                <h4 style="margin-bottom:10px;">Detailed Tracking Logs:</h4>
+                <div id="report-logs"></div>
+            </div>
+            
         </div>
         <button class="btn-primary download-btn" id="download-btn" onclick="downloadReportAsPDF()">Download Report as PDF</button>
     </div>
 </div>
 
 <script>
-    function updateClock() {
-        document.getElementById('ist-clock').innerText = new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true });
-    }
+    function updateClock() { document.getElementById('ist-clock').innerText = new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true }); }
     setInterval(updateClock, 1000); updateClock();
 
     let player, activityLogs = [], graphData = [], sessionStartTime = null, isVideoPlaying = false;
     let trackingInterval, lastVideoTime = 0, totalRealPlayTimeMs = 0, totalRealPauseTimeMs = 0;
     let seekCount = 0, currentSpeed = 1, isDraggingTimeline = false, isFirstPlay = true;
-    
-    let hideControlsTimeout;
-    let isControlsVisible = true;
+    let hideControlsTimeout; let isControlsVisible = true;
 
     const tag = document.createElement('script');
     tag.src = "https://www.youtube.com/iframe_api";
@@ -191,50 +196,29 @@
         return `${m}:${s}`; 
     }
 
-    function toggleControlsVisibility() {
-        if (isControlsVisible) hideControls();
-        else showControls();
-    }
-
+    function toggleControlsVisibility() { if (isControlsVisible) hideControls(); else showControls(); }
     function showControls() {
-        const controls = document.getElementById('custom-controls');
-        const wrapper = document.getElementById('video-wrapper');
-        if (controls) {
-            controls.classList.remove('hidden');
-            wrapper.style.cursor = "default";
-            isControlsVisible = true;
-        }
+        const controls = document.getElementById('custom-controls'), wrapper = document.getElementById('video-wrapper');
+        if (controls) { controls.classList.remove('hidden'); wrapper.style.cursor = "default"; isControlsVisible = true; }
         clearTimeout(hideControlsTimeout);
         if (isVideoPlaying) hideControlsTimeout = setTimeout(hideControls, 3500);
     }
-
     function hideControls() {
-        const controls = document.getElementById('custom-controls');
-        const wrapper = document.getElementById('video-wrapper');
-        if (controls) {
-            controls.classList.add('hidden');
-            wrapper.style.cursor = "none";
-            isControlsVisible = false;
-        }
+        const controls = document.getElementById('custom-controls'), wrapper = document.getElementById('video-wrapper');
+        if (controls) { controls.classList.add('hidden'); wrapper.style.cursor = "none"; isControlsVisible = false; }
         clearTimeout(hideControlsTimeout);
     }
 
     let lastMouseX = 0, lastMouseY = 0;
     document.getElementById('video-wrapper').addEventListener('mousemove', (e) => {
-        if (Math.abs(e.clientX - lastMouseX) > 5 || Math.abs(e.clientY - lastMouseY) > 5) {
-            showControls(); lastMouseX = e.clientX; lastMouseY = e.clientY;
-        }
+        if (Math.abs(e.clientX - lastMouseX) > 5 || Math.abs(e.clientY - lastMouseY) > 5) { showControls(); lastMouseX = e.clientX; lastMouseY = e.clientY; }
     });
-
-    document.getElementById('custom-controls').addEventListener('click', (e) => {
-        e.stopPropagation(); showControls(); 
-    });
+    document.getElementById('custom-controls').addEventListener('click', (e) => { e.stopPropagation(); showControls(); });
 
     function showCenterIcon(type) {
         const icon = document.getElementById('center-action-icon');
         icon.innerHTML = type === 'play' ? '▶' : '⏸';
-        icon.classList.add('show');
-        setTimeout(() => icon.classList.remove('show'), 500);
+        icon.classList.add('show'); setTimeout(() => icon.classList.remove('show'), 500);
     }
 
     function initVideoLoad() {
@@ -244,8 +228,8 @@
         document.getElementById('video-wrapper').style.display = "block";
         document.getElementById('generate-report-btn').style.display = "block";
         document.getElementById('report-wrapper').style.display = "none";
-        
         document.getElementById('dynamic-shield').style.display = "none"; 
+        
         activityLogs = []; graphData = []; sessionStartTime = new Date();
         totalRealPlayTimeMs = 0; totalRealPauseTimeMs = 0; seekCount = 0; currentSpeed = 1; lastVideoTime = 0;
         isFirstPlay = true; isDraggingTimeline = false;
@@ -254,9 +238,7 @@
         document.getElementById('progress-bar').value = 0;
         document.getElementById('big-play-btn').style.display = "block"; 
         
-        showControls(); 
-        logActivity("System", "Video loaded. Waiting for user interaction.", 0);
-
+        showControls(); logActivity("System", "Video loaded. Waiting for interaction.", 0);
         let currentOrigin = window.location.origin;
         if (!currentOrigin || currentOrigin === "null" || window.location.protocol.startsWith("file")) currentOrigin = "https://www.youtube.com"; 
 
@@ -264,74 +246,48 @@
         document.getElementById('player-container').insertAdjacentHTML('afterbegin', '<div id="player"></div>');
 
         player = new YT.Player('player', {
-            videoId: videoId,
-            host: 'https://www.youtube.com',
+            videoId: videoId, host: 'https://www.youtube.com',
             playerVars: { 'controls': 0, 'disablekb': 1, 'rel': 0, 'modestbranding': 1, 'playsinline': 1, 'origin': currentOrigin, 'enablejsapi': 1 },
             events: { 'onStateChange': onPlayerStateChange, 'onPlaybackRateChange': onPlaybackRateChange, 'onReady': () => { setInterval(updateCustomUI, 500); } }
         });
-
         clearInterval(trackingInterval); trackingInterval = setInterval(trackRealtimeData, 1000);
     }
 
     function startInitialPlayback(event) {
-        event.stopPropagation();
-        document.getElementById('big-play-btn').style.display = "none";
-        if (player && typeof player.playVideo === 'function') {
-            player.playVideo(); isFirstPlay = false;
-        }
+        event.stopPropagation(); document.getElementById('big-play-btn').style.display = "none";
+        if (player && typeof player.playVideo === 'function') { player.playVideo(); isFirstPlay = false; }
     }
 
     function onPlayerStateChange(event) {
-        const vTime = player.getCurrentTime();
-        const btn = document.getElementById('play-pause-btn');
-        
+        const vTime = player.getCurrentTime(), btn = document.getElementById('play-pause-btn');
         if (event.data == YT.PlayerState.PLAYING) {
-            document.getElementById('dynamic-shield').style.display = "block";
-            isVideoPlaying = true; btn.innerHTML = "⏸ Pause"; btn.style.background = "#dc2626"; 
-            logActivity("Play", "Video started playing", vTime);
-            showCenterIcon('play'); showControls(); 
+            document.getElementById('dynamic-shield').style.display = "block"; isVideoPlaying = true; 
+            btn.innerHTML = "⏸ Pause"; btn.style.background = "#dc2626"; 
+            logActivity("Play", "Video started playing", vTime); showCenterIcon('play'); showControls(); 
         } else if (event.data == YT.PlayerState.PAUSED) {
             isVideoPlaying = false; btn.innerHTML = "▶ Play"; btn.style.background = "#334155"; 
-            logActivity("Pause", "Video paused", vTime);
-            showCenterIcon('pause'); showControls(); 
+            logActivity("Pause", "Video paused", vTime); showCenterIcon('pause'); showControls(); 
         }
     }
 
     let clickTimer = null;
     function handleVideoClick(event) {
         if (isFirstPlay || !player || typeof player.getCurrentTime !== 'function') return;
-        
-        const rect = event.target.getBoundingClientRect();
-        const clickX = event.clientX - rect.left;
-        const clickY = event.clientY - rect.top;
-        
+        const rect = event.target.getBoundingClientRect(), clickX = event.clientX - rect.left, clickY = event.clientY - rect.top;
         const isCenterClick = (clickX > rect.width * 0.35 && clickX < rect.width * 0.65 && clickY > rect.height * 0.3 && clickY < rect.height * 0.7);
 
         if (clickTimer) {
             clearTimeout(clickTimer); clickTimer = null;
-            if (!isCenterClick) { 
-                if (clickX < rect.width * 0.4) skipTime(-10); 
-                else if (clickX > rect.width * 0.6) skipTime(10); 
-            }
+            if (!isCenterClick) { if (clickX < rect.width * 0.4) skipTime(-10); else if (clickX > rect.width * 0.6) skipTime(10); }
         } else {
-            clickTimer = setTimeout(() => { 
-                clickTimer = null; 
-                if (isCenterClick) togglePlayPause();
-                else toggleControlsVisibility();
-            }, 250); 
+            clickTimer = setTimeout(() => { clickTimer = null; if (isCenterClick) togglePlayPause(); else toggleControlsVisibility(); }, 250); 
         }
     }
 
-    function togglePlayPause() { 
-        if (player.getPlayerState() === YT.PlayerState.PLAYING) player.pauseVideo(); 
-        else player.playVideo(); 
-    }
-
+    function togglePlayPause() { if (player.getPlayerState() === YT.PlayerState.PLAYING) player.pauseVideo(); else player.playVideo(); }
     function skipTime(seconds) {
-        if (!player || typeof player.getCurrentTime !== 'function') return;
-        player.seekTo(player.getCurrentTime() + seconds, true);
-        const feedback = document.getElementById('skip-feedback');
-        feedback.innerText = seconds > 0 ? ">> 10s" : "<< 10s"; feedback.style.left = seconds > 0 ? "75%" : "25%";
+        if (!player || typeof player.getCurrentTime !== 'function') return; player.seekTo(player.getCurrentTime() + seconds, true);
+        const feedback = document.getElementById('skip-feedback'); feedback.innerText = seconds > 0 ? ">> 10s" : "<< 10s"; feedback.style.left = seconds > 0 ? "75%" : "25%";
         feedback.classList.add('show'); setTimeout(() => feedback.classList.remove('show'), 400);
     }
     
@@ -340,26 +296,9 @@
         const current = player.getCurrentTime(), duration = player.getDuration();
         if (duration > 0) { document.getElementById('progress-bar').value = (current / duration) * 100; document.getElementById('time-display').innerText = `${formatTimeSec(current)} / ${formatTimeSec(duration)}`; }
     }
-    
-    function draggingTimeline() { 
-        isDraggingTimeline = true; showControls(); 
-        if (!player || !player.getDuration) return; 
-        document.getElementById('time-display').innerText = `${formatTimeSec((document.getElementById('progress-bar').value / 100) * player.getDuration())} / ${formatTimeSec(player.getDuration())}`; 
-    }
-    
-    function seekVideo() { 
-        if (!player || !player.getDuration) return; 
-        player.seekTo((document.getElementById('progress-bar').value / 100) * player.getDuration(), true); 
-        isDraggingTimeline = false; 
-    }
-    
-    function changeSpeed() { 
-        const s = document.getElementById('speed-slider').value; 
-        document.getElementById('speed-display').innerText = s + "x"; 
-        if (player) player.setPlaybackRate(parseFloat(s)); 
-        showControls();
-    }
-
+    function draggingTimeline() { isDraggingTimeline = true; showControls(); if (!player || !player.getDuration) return; document.getElementById('time-display').innerText = `${formatTimeSec((document.getElementById('progress-bar').value / 100) * player.getDuration())} / ${formatTimeSec(player.getDuration())}`; }
+    function seekVideo() { if (!player || !player.getDuration) return; player.seekTo((document.getElementById('progress-bar').value / 100) * player.getDuration(), true); isDraggingTimeline = false; }
+    function changeSpeed() { const s = document.getElementById('speed-slider').value; document.getElementById('speed-display').innerText = s + "x"; if (player) player.setPlaybackRate(parseFloat(s)); showControls(); }
     function toggleFullScreen() {
         const w = document.getElementById('video-wrapper');
         if (!document.fullscreenElement && !document.webkitFullscreenElement) { if (w.requestFullscreen) w.requestFullscreen(); else if (w.webkitRequestFullscreen) w.webkitRequestFullscreen(); } 
@@ -368,31 +307,20 @@
 
     function trackRealtimeData() {
         if (!player || !player.getCurrentTime) return;
-        const elapsedRealSec = Math.floor((new Date() - sessionStartTime) / 1000);
-        const currentVideoTime = player.getCurrentTime();
+        const elapsedRealSec = Math.floor((new Date() - sessionStartTime) / 1000), currentVideoTime = player.getCurrentTime();
         if (isVideoPlaying) {
             if (Math.abs(currentVideoTime - (lastVideoTime + currentSpeed)) > 2.5) { seekCount++; logActivity("Seek/Drag", `Video timeline jumped`, currentVideoTime); }
             totalRealPlayTimeMs += 1000;
         } else totalRealPauseTimeMs += 1000;
         graphData.push({ x: elapsedRealSec, y: currentVideoTime }); lastVideoTime = currentVideoTime;
     }
-
     function onPlaybackRateChange(event) { currentSpeed = event.data; document.getElementById('speed-slider').value = currentSpeed; document.getElementById('speed-display').innerText = currentSpeed + "x"; logActivity("Speed", `Playback speed changed to ${currentSpeed}x`, player.getCurrentTime()); }
     function logActivity(action, details, vTimeSec) { activityLogs.push({ realTime: new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true }), videoTime: formatTimeSec(vTimeSec), action, details }); }
-
-    function formatDur(ms) { 
-        const totalSec = Math.floor(ms / 1000);
-        const h = Math.floor(totalSec / 3600);
-        const m = Math.floor((totalSec % 3600) / 60);
-        const s = totalSec % 60;
-        if (h > 0) return `${h} hr ${m} min ${s} sec`;
-        return `${m} min ${s} sec`; 
-    }
+    function formatDur(ms) { const totalSec = Math.floor(ms / 1000), h = Math.floor(totalSec / 3600), m = Math.floor((totalSec % 3600) / 60), s = totalSec % 60; if (h > 0) return `${h} hr ${m} min ${s} sec`; return `${m} min ${s} sec`; }
 
     function generateReport() {
         if (!sessionStartTime) return; clearInterval(trackingInterval); player.pauseVideo();
         logActivity("System", "Report generation complete", player.getCurrentTime());
-        
         clearTimeout(hideControlsTimeout);
         document.getElementById('video-wrapper').style.display = "none"; document.getElementById('generate-report-btn').style.display = "none";
         document.getElementById('report-wrapper').style.display = "block"; document.getElementById('download-btn').style.display = "block";
@@ -407,63 +335,73 @@
     let watchChart = null;
     function generateGraph() {
         if(watchChart) watchChart.destroy();
-        const maxPoints = 500;
-        const step = Math.ceil(graphData.length / maxPoints);
-        const optimizedX = graphData.filter((_, i) => i % step === 0).map(d => d.x);
-        const optimizedY = graphData.filter((_, i) => i % step === 0).map(d => d.y);
-
-        watchChart = new Chart(document.getElementById('watchGraph').getContext('2d'), { 
-            type: 'line', 
-            data: { labels: optimizedX, datasets: [{ label: 'Video Timeline Position (sec)', data: optimizedY, borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.2)', borderWidth: 2, pointRadius: 0, tension: 0.1 }] }, 
-            options: { responsive: true, maintainAspectRatio: false } 
-        });
+        const maxPoints = 500, step = Math.ceil(graphData.length / maxPoints);
+        const optimizedX = graphData.filter((_, i) => i % step === 0).map(d => d.x), optimizedY = graphData.filter((_, i) => i % step === 0).map(d => d.y);
+        watchChart = new Chart(document.getElementById('watchGraph').getContext('2d'), { type: 'line', data: { labels: optimizedX, datasets: [{ label: 'Video Timeline Position (sec)', data: optimizedY, borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.2)', borderWidth: 2, pointRadius: 0, tension: 0.1 }] }, options: { responsive: true, maintainAspectRatio: false } });
     }
-
     function generateComplexQR() {
         document.getElementById("qrcode").innerHTML = ""; 
         const rawData = `S:${sessionStartTime.getTime()}|PT:${totalRealPlayTimeMs}|PA:${totalRealPauseTimeMs}|SK:${seekCount}|SP:${currentSpeed}`;
-        const hashedData = btoa(encodeURIComponent(rawData)).substring(0, 50);
-        const authSignature = `AUTH_YT_${Math.floor(Math.random() * 999999)}_${hashedData}`;
-        new QRCode(document.getElementById("qrcode"), { text: authSignature, width: 200, height: 200, colorDark: "#0f172a", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.H });
+        new QRCode(document.getElementById("qrcode"), { text: `AUTH_YT_${Math.floor(Math.random() * 999999)}_${btoa(encodeURIComponent(rawData)).substring(0, 50)}`, width: 200, height: 200, colorDark: "#0f172a", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.H });
     }
 
-    // ---------------- PDF Generation Logic (NEW) ----------------
-    function downloadReportAsPDF() {
+    // ---------------- PDF Auto-Pagination Engine ----------------
+    async function downloadReportAsPDF() {
         const btn = document.getElementById('download-btn'); 
-        btn.innerText = "Preparing PDF... (Please wait)"; 
+        btn.innerText = "Generating multi-page PDF... (Please wait)"; 
         btn.disabled = true;
 
-        const reportElement = document.getElementById('printable-report');
-
-        html2canvas(reportElement, { 
-            scale: 2, // High resolution for clear text and QR in PDF
-            useCORS: true, 
-            backgroundColor: "#ffffff" 
-        }).then(canvas => {
-            const imgData = canvas.toDataURL("image/png");
-            
-            // Access jsPDF from the window object
+        try {
             const { jsPDF } = window.jspdf;
-            const pdf = new jsPDF('p', 'mm', 'a4'); // Portrait, Millimeters, A4 standard size
-            
+            const pdf = new jsPDF('p', 'mm', 'a4');
             const pdfWidth = pdf.internal.pageSize.getWidth();
-            // Calculate proportional height based on A4 width
-            const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+            const margin = 10; 
+            const contentWidth = pdfWidth - (margin * 2);
+
+            // The exact groups/sections we want on separate pages
+            const sections = ['pdf-section-summary', 'pdf-section-graph', 'pdf-section-logs'];
             
-            // Add the snapshot to the PDF (x: 0, y: 0)
-            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+            for (let i = 0; i < sections.length; i++) {
+                const el = document.getElementById(sections[i]);
+                
+                // Render the specific group into a high-res image
+                const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
+                const imgData = canvas.toDataURL("image/png");
+                
+                const imgWidth = contentWidth;
+                const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                const usablePageHeight = pdfHeight - (margin * 2);
+                
+                let heightLeft = imgHeight;
+                let position = margin; // Starting position on the Y axis
+
+                // Add a new page for every section EXCEPT the very first one
+                if (i > 0) { pdf.addPage(); }
+
+                // Add the first slice of the current section
+                pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
+                heightLeft -= usablePageHeight;
+
+                // Auto-pagination: If the section (like logs) is extremely long, automatically slice into new A4 pages
+                while (heightLeft > 0) {
+                    pdf.addPage();
+                    position -= usablePageHeight; // Shift the image up mathematically to print the next part
+                    pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
+                    heightLeft -= usablePageHeight;
+                }
+            }
             
-            // Trigger PDF Download
+            // Save the final multipage PDF
             pdf.save(`Video_Audit_Report_${new Date().getTime()}.pdf`);
             
-            btn.innerText = "Download Report as PDF"; 
-            btn.disabled = false;
-        }).catch(err => {
+        } catch (err) {
             console.error(err);
             alert("Error generating PDF!");
+        } finally {
             btn.innerText = "Download Report as PDF"; 
             btn.disabled = false;
-        });
+        }
     }
 </script>
 </body>
