@@ -7,7 +7,6 @@
     
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
     <style>
@@ -80,10 +79,9 @@
         .download-btn:hover { background: #059669; }
         
         /* ---------------- Report Section ---------------- */
-        #printable-report { background: #ffffff; border-radius: 8px; margin-top: 20px; width: 100%; box-sizing: border-box; }
+        #printable-report { background: #ffffff; border-radius: 8px; margin-top: 20px; width: 100%; box-sizing: border-box; word-wrap: break-word; }
         .session-report-block { padding: 20px; border: 2px solid #e2e8f0; border-radius: 8px; margin-bottom: 30px; background: #ffffff; width: 100%; box-sizing: border-box; }
         
-        /* New Data Format Styles */
         .new-data-format { display: flex; flex-direction: column; gap: 10px; margin: 20px 0; width: 100%; }
         .data-card { display: flex; justify-content: space-between; align-items: center; background: #f1f5f9; padding: 12px 20px; border-radius: 8px; border: 1px solid #e2e8f0; width: 100%; word-wrap: break-word; }
         .data-title { font-weight: bold; color: #475569; font-size: 1rem; flex: 1; }
@@ -174,26 +172,36 @@
 </div>
 
 <script>
-    // ---------------- Anti Pull-to-Refresh Logic ----------------
+    // ---------------- Anti Pull-to-Refresh Logic (JS Method) ----------------
     let touchStartY = 0;
-    document.addEventListener('touchstart', e => { touchStartY = e.touches[0].clientY; }, {passive: false});
+    document.addEventListener('touchstart', e => { 
+        touchStartY = e.touches[0].clientY; 
+    }, {passive: false});
+    
     document.addEventListener('touchmove', e => {
         let touchY = e.touches[0].clientY;
         let touchDiff = touchY - touchStartY;
-        if (touchDiff > 0 && window.scrollY === 0) { e.preventDefault(); }
+        if (touchDiff > 0 && window.scrollY === 0) {
+            e.preventDefault(); 
+        }
     }, {passive: false});
 
+    // ---------------- Refresh Button Confirmation ----------------
     function confirmRefresh() {
         if (confirm("Are you sure you want to refresh? All your tracking data will be permanently lost!")) {
             window.onbeforeunload = null; 
             window.location.reload();
         }
     }
+
     window.addEventListener('beforeunload', function (e) {
-        if (sessionStartTime) { e.preventDefault(); e.returnValue = ''; }
+        if (sessionStartTime) { 
+            e.preventDefault();
+            e.returnValue = '';
+        }
     });
 
-    // ---------------- System Variables ----------------
+    // ---------------- Existing Logic ----------------
     function updateClock() { document.getElementById('ist-clock').innerText = new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true }); }
     setInterval(updateClock, 1000); updateClock();
 
@@ -203,8 +211,6 @@
     let seekCount = 0, currentSpeed = 1, isDraggingTimeline = false, isFirstPlay = true;
     let hideControlsTimeout; let isControlsVisible = true;
     let reportCounter = 0; 
-    
-    // Store variables globally for PDF generation
     let cachedSummaryData = {};
 
     const tag = document.createElement('script');
@@ -228,7 +234,6 @@
     }
     function formatDur(ms) { const totalSec = Math.floor(ms / 1000), h = Math.floor(totalSec / 3600), m = Math.floor((totalSec % 3600) / 60), s = totalSec % 60; if (h > 0) return `${h} hr ${m} min ${s} sec`; return `${m} min ${s} sec`; }
 
-    // ---------------- UI Handlers ----------------
     function toggleControlsVisibility() { if (isControlsVisible) hideControls(); else showControls(); }
     function showControls() {
         const controls = document.getElementById('custom-controls'), wrapper = document.getElementById('video-wrapper');
@@ -254,7 +259,6 @@
         icon.classList.add('show'); setTimeout(() => icon.classList.remove('show'), 500);
     }
 
-    // ---------------- Video Logic ----------------
     function initVideoLoad() {
         const videoId = extractVideoID(document.getElementById('video-url').value);
         if (!videoId) return alert("Please enter a valid YouTube link!");
@@ -364,7 +368,7 @@
     function onPlaybackRateChange(event) { currentSpeed = event.data; document.getElementById('speed-slider').value = currentSpeed; document.getElementById('speed-display').innerText = currentSpeed + "x"; logActivity("Speed", `Playback speed changed to ${currentSpeed}x`, player.getCurrentTime()); }
     function logActivity(action, details, vTimeSec) { activityLogs.push({ realTime: new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true }), videoTime: formatTimeSec(vTimeSec), action, details }); }
 
-    // ---------------- Report Display on Screen ----------------
+    // ---------------- HTML Display Generation ----------------
     function generateReport() {
         if (!sessionStartTime) return; 
         window.onbeforeunload = null; 
@@ -382,7 +386,6 @@
         reportCounter++;
         globalSessionId = Date.now(); 
 
-        // Cache summary data for the PDF generator
         cachedSummaryData = {
             totalSession: formatDur(new Date() - sessionStartTime),
             totalPlay: formatDur(totalRealPlayTimeMs),
@@ -396,28 +399,16 @@
             logsHTML += `<div class="log-item"><span>[${l.realTime}]</span> | <span style="color: #000000;">Video Time:</span> <span>${l.videoTime}</span> | <span style="color:${col};">${l.action}</span> - <span style="color: #000000;">${l.details}</span></div>`; 
         });
 
-        // Visible HTML Report Block (What user sees on screen)
+        // HTML Display for the webpage (NOT for the PDF layout)
         const reportTemplate = `
             <div id="session-report-${globalSessionId}" class="session-report-block">
                 <h2 style="text-align:center; color:#1e293b; border-bottom: 2px solid #cbd5e1; padding-bottom: 15px; margin-top:0;">Official Watch Report (Session ${reportCounter})</h2>
                 
-                <div id="ui-summary-${globalSessionId}" class="new-data-format">
-                    <div class="data-card">
-                        <span class="data-title">Total Session Time</span>
-                        <span class="data-value">${cachedSummaryData.totalSession}</span>
-                    </div>
-                    <div class="data-card">
-                        <span class="data-title">Total Play Time</span>
-                        <span class="data-value" style="color: green;">${cachedSummaryData.totalPlay}</span>
-                    </div>
-                    <div class="data-card">
-                        <span class="data-title">Total Pause Time</span>
-                        <span class="data-value" style="color: red;">${cachedSummaryData.totalPause}</span>
-                    </div>
-                    <div class="data-card">
-                        <span class="data-title">Total Seeks (Drags/Skips)</span>
-                        <span class="data-value" style="color: orange;">${cachedSummaryData.totalSeeks} times</span>
-                    </div>
+                <div class="new-data-format">
+                    <div class="data-card"><span class="data-title">Total Session Time</span><span class="data-value">${cachedSummaryData.totalSession}</span></div>
+                    <div class="data-card"><span class="data-title">Total Play Time</span><span class="data-value" style="color: green;">${cachedSummaryData.totalPlay}</span></div>
+                    <div class="data-card"><span class="data-title">Total Pause Time</span><span class="data-value" style="color: red;">${cachedSummaryData.totalPause}</span></div>
+                    <div class="data-card"><span class="data-title">Total Seeks (Drags/Skips)</span><span class="data-value" style="color: orange;">${cachedSummaryData.totalSeeks} times</span></div>
                 </div>
 
                 <div style="text-align: center; padding-top: 20px;">
@@ -460,7 +451,6 @@
             options: { responsive: true, maintainAspectRatio: false, animation: false } 
         });
 
-        // Convert Canvas element to pure Image for flawless PDF generation
         setTimeout(() => {
             const chartBox = document.getElementById(boxId);
             if (canvasElement && chartBox) {
@@ -495,10 +485,8 @@
                 img.style.height = "250px";
                 img.style.display = "block";
                 img.style.margin = "0 auto";
-                
                 wrapperBox.innerHTML = "";
                 wrapperBox.appendChild(img);
-                
                 const p = document.createElement("p");
                 p.innerText = "Auth Signature";
                 p.style.color = "#000000";
@@ -507,7 +495,34 @@
         }, 300);
     }
 
-    // ---------------- jsPDF Engine for 4 Separate Perfect PDFs ----------------
+    // ---------------- QR Code Data URL Generator Helper ----------------
+    function getQRDataURL(text) {
+        return new Promise((resolve) => {
+            const tempDiv = document.createElement("div");
+            new QRCode(tempDiv, {
+                text: text,
+                width: 150, // High enough resolution for 20x20mm print
+                height: 150,
+                colorDark: "#0f172a",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.L
+            });
+            setTimeout(() => {
+                const canvas = tempDiv.querySelector('canvas');
+                resolve(canvas.toDataURL('image/png'));
+            }, 50);
+        });
+    }
+
+    // New Complex Algorithm for Page-Specific QR Codes
+    function generatePageQRData(pdfName, pageNum) {
+        const base = `SESSION:${globalSessionId}|PDF:${pdfName}|PAGE:${pageNum}|PT:${totalRealPlayTimeMs}`;
+        const salt = Math.floor(Math.random() * 99999) + pageNum * 7;
+        const hashed = btoa(encodeURIComponent(base + salt)).substring(0, 30);
+        return `PAGE_AUTH_[${pdfName}_P${pageNum}]_${hashed}`;
+    }
+
+    // ---------------- NEW 4-SEPARATE PDFs DOWNLOAD ENGINE ----------------
     async function downloadFourPDFs() {
         const btn = document.getElementById('download-btn'); 
         btn.innerText = "Processing 4 PDFs... Do not close"; 
@@ -517,9 +532,18 @@
         const { jsPDF } = window.jspdf;
 
         try {
+            // Function to add the unique Top-Right 5% QR Code
+            const addTopRightQR = async (pdfDoc, pdfName, pageNum) => {
+                const qrUrl = await getQRDataURL(generatePageQRData(pdfName, pageNum));
+                // A4 is 210mm wide. 20mm x 20mm in top right corner (X=180, Y=10)
+                pdfDoc.addImage(qrUrl, 'PNG', 180, 10, 20, 20);
+            };
+
             // ================= PDF 1: Summary =================
             btn.innerText = "Downloading 1 of 4 (Summary)...";
             const pdf1 = new jsPDF('p', 'mm', 'a4');
+            await addTopRightQR(pdf1, 'Summary', 1);
+            
             pdf1.setFont("helvetica", "bold");
             pdf1.setFontSize(22);
             pdf1.setTextColor(30, 41, 59);
@@ -530,14 +554,12 @@
             pdf1.line(20, 40, 190, 40);
 
             pdf1.setFontSize(14);
-            pdf1.setTextColor(71, 85, 105);
             
-            // Draw custom boxes using native jsPDF rects for perfect crisp text
             let y = 60;
             const drawDataRow = (title, val, valColor) => {
-                pdf1.setFillColor(241, 245, 249); // #f1f5f9
-                pdf1.setDrawColor(226, 232, 240); // #e2e8f0
-                pdf1.roundedRect(20, y, 170, 15, 3, 3, 'FD'); // Filled and outlined rounded rect
+                pdf1.setFillColor(241, 245, 249); 
+                pdf1.setDrawColor(226, 232, 240); 
+                pdf1.roundedRect(20, y, 170, 15, 3, 3, 'FD'); 
                 
                 pdf1.setFont("helvetica", "bold");
                 pdf1.setTextColor(71, 85, 105);
@@ -559,6 +581,8 @@
             // ================= PDF 2: QR Code =================
             btn.innerText = "Downloading 2 of 4 (QR Code)...";
             const pdf2 = new jsPDF('p', 'mm', 'a4');
+            await addTopRightQR(pdf2, 'AuthSignature', 1);
+
             pdf2.setFont("helvetica", "bold");
             pdf2.setFontSize(18);
             pdf2.setTextColor(30, 41, 59);
@@ -566,7 +590,6 @@
 
             const qrImgEl = document.querySelector(`#qr-box-${sid} img`);
             if (qrImgEl) {
-                // Centered 100x100 mm image
                 pdf2.addImage(qrImgEl.src, 'PNG', 55, 70, 100, 100);
             }
             
@@ -579,6 +602,8 @@
             // ================= PDF 3: Graph =================
             btn.innerText = "Downloading 3 of 4 (Graph)...";
             const pdf3 = new jsPDF('p', 'mm', 'a4');
+            await addTopRightQR(pdf3, 'Graph', 1);
+
             pdf3.setFont("helvetica", "bold");
             pdf3.setFontSize(16);
             pdf3.setTextColor(30, 41, 59);
@@ -594,6 +619,9 @@
             // ================= PDF 4: Detailed Logs =================
             btn.innerText = "Downloading 4 of 4 (Detailed Logs)...";
             const pdf4 = new jsPDF('p', 'mm', 'a4');
+            let pageNum = 1;
+            await addTopRightQR(pdf4, 'Logs', pageNum);
+
             pdf4.setFont("helvetica", "bold");
             pdf4.setFontSize(16);
             pdf4.setTextColor(30, 41, 59);
@@ -608,13 +636,17 @@
             let logY = 35;
             const pageHeight = pdf4.internal.pageSize.getHeight();
 
-            activityLogs.forEach(l => {
+            for (let i = 0; i < activityLogs.length; i++) {
+                const l = activityLogs[i];
+
                 if (logY > pageHeight - 20) {
                     pdf4.addPage();
-                    logY = 20; // reset Y for new page
+                    pageNum++;
+                    await addTopRightQR(pdf4, 'Logs', pageNum); // Add QR to new page
+                    logY = 35; // Start below the QR code area on new pages
                 }
 
-                pdf4.setTextColor(0, 0, 0); // Black bracket text
+                pdf4.setTextColor(0, 0, 0); 
                 pdf4.setFont("helvetica", "bold");
                 const timeText = `[${l.realTime}]`;
                 pdf4.text(timeText, 20, logY);
@@ -632,7 +664,6 @@
                 pdf4.text(" | ", currentX, logY);
                 currentX += pdf4.getTextWidth(" | ");
 
-                // Colorize the action word
                 pdf4.setFont("helvetica", "bold");
                 if (l.action === "Play") pdf4.setTextColor(0, 128, 0);
                 else if (l.action === "Pause") pdf4.setTextColor(220, 38, 38);
@@ -641,16 +672,15 @@
                 pdf4.text(l.action, currentX, logY);
                 currentX += pdf4.getTextWidth(l.action) + 2;
 
-                pdf4.setTextColor(0, 0, 0); // Back to black
+                pdf4.setTextColor(0, 0, 0); 
                 pdf4.setFont("helvetica", "normal");
                 pdf4.text(`- ${l.details}`, currentX, logY);
 
-                // Add faint separator line
                 logY += 4;
                 pdf4.setDrawColor(226, 232, 240);
                 pdf4.line(20, logY, 190, logY);
-                logY += 7; // spacing for next row
-            });
+                logY += 7; 
+            }
 
             pdf4.save(`4_Detailed_Logs_${sid}.pdf`);
 
