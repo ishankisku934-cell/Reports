@@ -10,7 +10,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
     <style>
-        /* Mobile Fit Fix: Global Box Sizing */
         * { box-sizing: border-box; }
         
         :root {
@@ -21,16 +20,8 @@
             --dark-player: #0f172a;
         }
         
-        /* Fixed Scrolling Issue on Mobile */
-        body { 
-            overscroll-behavior-y: contain; /* Prevents pull-to-refresh without locking scroll */
-            font-family: 'Segoe UI', sans-serif; 
-            background-color: var(--bg); 
-            color: var(--text); 
-            margin: 0; 
-            padding: 15px 10px; 
-            overflow-x: hidden; 
-        }
+        /* Removed overscroll-behavior to fix scrolling issues, handled via JS now */
+        body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 15px 10px; overflow-x: hidden; }
         
         .container { max-width: 900px; width: 100%; background: var(--card-bg); padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); margin: 0 auto; }
         .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
@@ -90,16 +81,18 @@
         
         /* ---------------- Report Section ---------------- */
         #printable-report { background: #ffffff; border-radius: 8px; margin-top: 20px; width: 100%; box-sizing: border-box;}
-        
         .session-report-block { padding: 20px; border: 2px solid #e2e8f0; border-radius: 8px; margin-bottom: 30px; background: #ffffff; width: 100%; box-sizing: border-box; overflow: hidden; }
         
-        .report-header { display: flex; justify-content: center; align-items: center; border-bottom: 2px dashed #cbd5e1; padding-bottom: 15px; margin-bottom: 20px; }
-        .summary-box { background: #f1f5f9; padding: 15px; border-radius: 6px; font-weight: bold; line-height: 1.6; text-align: left; max-width: 500px; margin: 0 auto 30px auto; }
+        /* New Data Format Styles */
+        .new-data-format { display: flex; flex-direction: column; gap: 10px; margin: 20px 0; }
+        .data-card { display: flex; justify-content: space-between; align-items: center; background: #f1f5f9; padding: 12px 20px; border-radius: 8px; border: 1px solid #e2e8f0; }
+        .data-title { font-weight: bold; color: #475569; font-size: 1rem; }
+        .data-value { font-weight: bold; font-size: 1.1rem; }
         
-        .qr-wrapper { text-align: center; margin: 0 auto 30px auto; }
-        .qr-wrapper p { margin: 10px 0 0 0; font-size: 1rem; color: #64748b; font-weight: bold; }
+        .qr-wrapper { text-align: center; margin: 0 auto; padding: 20px; }
+        .qr-wrapper p { margin: 15px 0 0 0; font-size: 1rem; color: #64748b; font-weight: bold; }
         
-        .chart-container { position: relative; width: 100%; height: 350px; margin: 20px 0; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; box-sizing: border-box; }
+        .chart-container { position: relative; width: 100%; height: 350px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; box-sizing: border-box; }
         
         .log-item { padding: 8px; border-bottom: 1px solid #cbd5e1; font-size: 0.95rem; }
         .log-item span { font-weight: bold; }
@@ -109,6 +102,8 @@
             #custom-controls { padding: 10px; }
             .control-group { gap: 8px; justify-content: center; width: 100%; }
             #progress-bar { width: 100%; order: -1; margin-bottom: 5px; } 
+            .input-group { flex-direction: column; }
+            .data-card { flex-direction: column; align-items: flex-start; gap: 5px; }
         }
     </style>
 </head>
@@ -178,6 +173,23 @@
 </div>
 
 <script>
+    // ---------------- Anti Pull-to-Refresh Logic (JS Method) ----------------
+    // This allows smooth scrolling up and down but PREVENTS the browser from refreshing when pulled from the top.
+    let touchStartY = 0;
+    document.addEventListener('touchstart', e => { 
+        touchStartY = e.touches[0].clientY; 
+    }, {passive: false});
+    
+    document.addEventListener('touchmove', e => {
+        let touchY = e.touches[0].clientY;
+        let touchDiff = touchY - touchStartY;
+        // If at the very top of the page and swiping downwards -> Block default pull refresh!
+        if (touchDiff > 0 && window.scrollY === 0) {
+            e.preventDefault(); 
+        }
+    }, {passive: false});
+
+    // ---------------- Refresh Button Confirmation ----------------
     function confirmRefresh() {
         if (confirm("Are you sure you want to refresh? All your tracking data will be permanently lost!")) {
             window.onbeforeunload = null; 
@@ -185,6 +197,7 @@
         }
     }
 
+    // Prevents accidental Back button or exit
     window.addEventListener('beforeunload', function (e) {
         if (sessionStartTime) { 
             e.preventDefault();
@@ -192,6 +205,7 @@
         }
     });
 
+    // ---------------- Existing Logic ----------------
     function updateClock() { document.getElementById('ist-clock').innerText = new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true }); }
     setInterval(updateClock, 1000); updateClock();
 
@@ -332,18 +346,14 @@
         const current = player.getCurrentTime(), duration = player.getDuration();
         if (duration > 0) { document.getElementById('progress-bar').value = (current / duration) * 100; document.getElementById('time-display').innerText = `${formatTimeSec(current)} / ${formatTimeSec(duration)}`; }
     }
-    
     function draggingTimeline() { isDraggingTimeline = true; showControls(); if (!player || !player.getDuration) return; document.getElementById('time-display').innerText = `${formatTimeSec((document.getElementById('progress-bar').value / 100) * player.getDuration())} / ${formatTimeSec(player.getDuration())}`; }
     function seekVideo() { if (!player || !player.getDuration) return; player.seekTo((document.getElementById('progress-bar').value / 100) * player.getDuration(), true); isDraggingTimeline = false; }
     
     function changeSpeed() { const s = document.getElementById('speed-slider').value; document.getElementById('speed-display').innerText = s + "x"; if (player) player.setPlaybackRate(parseFloat(s)); showControls(); }
     
-    // Video Quality Control Logic
     function changeQuality() {
         const q = document.getElementById('quality-select').value;
-        if (player && typeof player.setPlaybackQuality === 'function') {
-            player.setPlaybackQuality(q);
-        }
+        if (player && typeof player.setPlaybackQuality === 'function') { player.setPlaybackQuality(q); }
         showControls();
     }
     function onPlaybackQualityChange(event) {
@@ -370,7 +380,7 @@
     function logActivity(action, details, vTimeSec) { activityLogs.push({ realTime: new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true }), videoTime: formatTimeSec(vTimeSec), action, details }); }
     function formatDur(ms) { const totalSec = Math.floor(ms / 1000), h = Math.floor(totalSec / 3600), m = Math.floor((totalSec % 3600) / 60), s = totalSec % 60; if (h > 0) return `${h} hr ${m} min ${s} sec`; return `${m} min ${s} sec`; }
 
-    // ---------------- Report Generation ----------------
+    // ---------------- Report Generation & PDF Structure ----------------
     function generateReport() {
         if (!sessionStartTime) return; 
         window.onbeforeunload = null; 
@@ -391,35 +401,49 @@
         let logsHTML = ""; 
         activityLogs.forEach(l => { 
             let col = l.action === "Play" ? "green" : l.action === "Pause" ? "red" : l.action === "Seek/Drag" ? "orange" : "blue";
-            // Important: added inline page-break-inside avoid
             logsHTML += `<div class="log-item" style="page-break-inside: avoid;"><span>[${l.realTime}]</span> | Video Time: <span>${l.videoTime}</span> | <span style="color:${col};">${l.action}</span> - ${l.details}</div>`; 
         });
 
-        // Strict HTML2PDF Page Break Structure
+        // Smart HTML2PDF Page Break Structure with New Data Format
         const reportTemplate = `
             <div id="session-report-${sessionId}" class="session-report-block">
                 
-                <div style="text-align: center;">
-                    <h2 style="margin-top:0; color:#1e293b; border-bottom: 2px dashed #cbd5e1; padding-bottom: 10px;">Official Watch Report (Session ${reportCounter})</h2>
-                    
-                    <h4 style="margin: 20px 0; color:#1e293b;">Authentication Signature</h4>
+                <div>
+                    <h2 style="text-align:center; color:#1e293b; border-bottom: 2px solid #cbd5e1; padding-bottom: 15px; margin-top:0;">Official Watch Report (Session ${reportCounter})</h2>
+                    <div class="new-data-format">
+                        <div class="data-card">
+                            <span class="data-title">Total Session Time</span>
+                            <span class="data-value">${formatDur(new Date() - sessionStartTime)}</span>
+                        </div>
+                        <div class="data-card">
+                            <span class="data-title">Total Play Time</span>
+                            <span class="data-value" style="color: green;">${formatDur(totalRealPlayTimeMs)}</span>
+                        </div>
+                        <div class="data-card">
+                            <span class="data-title">Total Pause Time</span>
+                            <span class="data-value" style="color: red;">${formatDur(totalRealPauseTimeMs)}</span>
+                        </div>
+                        <div class="data-card">
+                            <span class="data-title">Total Seeks (Drags/Skips)</span>
+                            <span class="data-value" style="color: orange;">${seekCount} times</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="html2pdf__page-break"></div>
+
+                <div style="text-align: center; padding-top: 20px;">
+                    <h3 style="margin-bottom: 30px; color:#1e293b;">Authentication Signature</h3>
                     <div class="qr-wrapper">
                         <div id="qr-${sessionId}" style="display: flex; justify-content: center;"></div>
                         <p>Auth Signature</p>
-                    </div>
-
-                    <div class="summary-box">
-                        Total Session Time: ${formatDur(new Date() - sessionStartTime)}<br>
-                        Total Play Time: <span style="color: green;">${formatDur(totalRealPlayTimeMs)}</span><br>
-                        Total Pause Time: <span style="color: red;">${formatDur(totalRealPauseTimeMs)}</span><br>
-                        Total Seeks (Drags/Skips): <span style="color: orange;">${seekCount} times</span>
                     </div>
                 </div>
 
                 <div class="html2pdf__page-break"></div>
 
                 <div style="padding-top: 20px;">
-                    <h4 style="margin-bottom:10px;">Timeline Graph (Real-time vs. Video Time):</h4>
+                    <h3 style="text-align: center; margin-bottom:20px; color:#1e293b;">Timeline Graph (Real-time vs. Video Time)</h3>
                     <div class="chart-container" style="page-break-inside: avoid;">
                         <canvas id="graph-${sessionId}"></canvas>
                     </div>
@@ -428,7 +452,7 @@
                 <div class="html2pdf__page-break"></div>
 
                 <div style="padding-top: 20px;">
-                    <h4 style="margin-bottom:10px;">Detailed Tracking Logs:</h4>
+                    <h3 style="color:#1e293b; border-bottom: 1px solid #cbd5e1; padding-bottom: 10px;">Detailed Tracking Logs:</h3>
                     <div>${logsHTML}</div>
                 </div>
             </div>
@@ -489,7 +513,7 @@
         element.style.width = '800px';
 
         const opt = {
-            margin:       10, // Universal 10mm margin
+            margin:       10, 
             filename:     `Video_Audit_Report_${new Date().getTime()}.pdf`,
             image:        { type: 'jpeg', quality: 1.0 },
             html2canvas:  { scale: 2, useCORS: true, windowWidth: 800 }, 
