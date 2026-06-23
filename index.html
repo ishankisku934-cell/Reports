@@ -8,6 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 
     <style>
         * { box-sizing: border-box; }
@@ -20,7 +21,8 @@
             --dark-player: #0f172a;
         }
         
-        body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 15px 10px; overflow-x: hidden; }
+        /* Fixed Scrolling Issue on Mobile */
+        body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 15px 10px; overflow-x: hidden; overscroll-behavior-y: contain; }
         
         .container { max-width: 900px; width: 100%; background: var(--card-bg); padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); margin: 0 auto; }
         .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
@@ -79,8 +81,8 @@
         .download-btn:hover { background: #059669; }
         
         /* ---------------- Report Section ---------------- */
-        #printable-report { background: #ffffff; border-radius: 8px; margin-top: 20px; width: 100%; box-sizing: border-box; word-wrap: break-word; }
-        .session-report-block { padding: 20px; border: 2px solid #e2e8f0; border-radius: 8px; margin-bottom: 30px; background: #ffffff; width: 100%; box-sizing: border-box; }
+        #printable-report { background: #ffffff; border-radius: 8px; margin-top: 20px; width: 100%; box-sizing: border-box; }
+        .session-report-block { padding: 20px; border: 2px solid #e2e8f0; border-radius: 8px; margin-bottom: 30px; background: #ffffff; width: 100%; box-sizing: border-box; overflow: hidden; }
         
         .new-data-format { display: flex; flex-direction: column; gap: 10px; margin: 20px 0; width: 100%; }
         .data-card { display: flex; justify-content: space-between; align-items: center; background: #f1f5f9; padding: 12px 20px; border-radius: 8px; border: 1px solid #e2e8f0; width: 100%; word-wrap: break-word; }
@@ -167,12 +169,12 @@
     
     <div id="report-wrapper" style="display:none;">
         <div id="printable-report"></div>
-        <button class="btn-primary download-btn" id="download-btn" onclick="downloadFourPDFs()">Download 4 Separate PDFs</button>
+        <button class="btn-primary download-btn" id="download-btn" onclick="downloadMergedPDF()">Download Single Merged PDF</button>
     </div>
 </div>
 
 <script>
-    // ---------------- Anti Pull-to-Refresh Logic (JS Method) ----------------
+    // ---------------- Anti Pull-to-Refresh Logic ----------------
     let touchStartY = 0;
     document.addEventListener('touchstart', e => { 
         touchStartY = e.touches[0].clientY; 
@@ -181,12 +183,12 @@
     document.addEventListener('touchmove', e => {
         let touchY = e.touches[0].clientY;
         let touchDiff = touchY - touchStartY;
+        // Blocks refresh ONLY when pulled from the absolute top.
         if (touchDiff > 0 && window.scrollY === 0) {
             e.preventDefault(); 
         }
     }, {passive: false});
 
-    // ---------------- Refresh Button Confirmation ----------------
     function confirmRefresh() {
         if (confirm("Are you sure you want to refresh? All your tracking data will be permanently lost!")) {
             window.onbeforeunload = null; 
@@ -201,7 +203,7 @@
         }
     });
 
-    // ---------------- Existing Logic ----------------
+    // ---------------- General Logic ----------------
     function updateClock() { document.getElementById('ist-clock').innerText = new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true }); }
     setInterval(updateClock, 1000); updateClock();
 
@@ -234,6 +236,7 @@
     }
     function formatDur(ms) { const totalSec = Math.floor(ms / 1000), h = Math.floor(totalSec / 3600), m = Math.floor((totalSec % 3600) / 60), s = totalSec % 60; if (h > 0) return `${h} hr ${m} min ${s} sec`; return `${m} min ${s} sec`; }
 
+    // ---------------- UI Handlers ----------------
     function toggleControlsVisibility() { if (isControlsVisible) hideControls(); else showControls(); }
     function showControls() {
         const controls = document.getElementById('custom-controls'), wrapper = document.getElementById('video-wrapper');
@@ -259,6 +262,7 @@
         icon.classList.add('show'); setTimeout(() => icon.classList.remove('show'), 500);
     }
 
+    // ---------------- Video Logic ----------------
     function initVideoLoad() {
         const videoId = extractVideoID(document.getElementById('video-url').value);
         if (!videoId) return alert("Please enter a valid YouTube link!");
@@ -345,7 +349,6 @@
     }
     function draggingTimeline() { isDraggingTimeline = true; showControls(); if (!player || !player.getDuration) return; document.getElementById('time-display').innerText = `${formatTimeSec((document.getElementById('progress-bar').value / 100) * player.getDuration())} / ${formatTimeSec(player.getDuration())}`; }
     function seekVideo() { if (!player || !player.getDuration) return; player.seekTo((document.getElementById('progress-bar').value / 100) * player.getDuration(), true); isDraggingTimeline = false; }
-    
     function changeSpeed() { const s = document.getElementById('speed-slider').value; document.getElementById('speed-display').innerText = s + "x"; if (player) player.setPlaybackRate(parseFloat(s)); showControls(); }
     function changeQuality() { const q = document.getElementById('quality-select').value; if (player && typeof player.setPlaybackQuality === 'function') { player.setPlaybackQuality(q); } showControls(); }
     function onPlaybackQualityChange(event) { const select = document.getElementById('quality-select'); if (select.querySelector(`option[value="${event.data}"]`)) { select.value = event.data; } }
@@ -368,7 +371,7 @@
     function onPlaybackRateChange(event) { currentSpeed = event.data; document.getElementById('speed-slider').value = currentSpeed; document.getElementById('speed-display').innerText = currentSpeed + "x"; logActivity("Speed", `Playback speed changed to ${currentSpeed}x`, player.getCurrentTime()); }
     function logActivity(action, details, vTimeSec) { activityLogs.push({ realTime: new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true }), videoTime: formatTimeSec(vTimeSec), action, details }); }
 
-    // ---------------- HTML Display Generation ----------------
+    // ---------------- Report Display on Screen ----------------
     function generateReport() {
         if (!sessionStartTime) return; 
         window.onbeforeunload = null; 
@@ -399,7 +402,6 @@
             logsHTML += `<div class="log-item"><span>[${l.realTime}]</span> | <span style="color: #000000;">Video Time:</span> <span>${l.videoTime}</span> | <span style="color:${col};">${l.action}</span> - <span style="color: #000000;">${l.details}</span></div>`; 
         });
 
-        // HTML Display for the webpage (NOT for the PDF layout)
         const reportTemplate = `
             <div id="session-report-${globalSessionId}" class="session-report-block">
                 <h2 style="text-align:center; color:#1e293b; border-bottom: 2px solid #cbd5e1; padding-bottom: 15px; margin-top:0;">Official Watch Report (Session ${reportCounter})</h2>
@@ -485,8 +487,10 @@
                 img.style.height = "250px";
                 img.style.display = "block";
                 img.style.margin = "0 auto";
+                
                 wrapperBox.innerHTML = "";
                 wrapperBox.appendChild(img);
+                
                 const p = document.createElement("p");
                 p.innerText = "Auth Signature";
                 p.style.color = "#000000";
@@ -495,13 +499,13 @@
         }, 300);
     }
 
-    // ---------------- QR Code Data URL Generator Helper ----------------
+    // ---------------- QR Code Helper for PDF Generation ----------------
     function getQRDataURL(text) {
         return new Promise((resolve) => {
             const tempDiv = document.createElement("div");
             new QRCode(tempDiv, {
                 text: text,
-                width: 150, // High enough resolution for 20x20mm print
+                width: 150, 
                 height: 150,
                 colorDark: "#0f172a",
                 colorLight: "#ffffff",
@@ -514,7 +518,6 @@
         });
     }
 
-    // New Complex Algorithm for Page-Specific QR Codes
     function generatePageQRData(pdfName, pageNum) {
         const base = `SESSION:${globalSessionId}|PDF:${pdfName}|PAGE:${pageNum}|PT:${totalRealPlayTimeMs}`;
         const salt = Math.floor(Math.random() * 99999) + pageNum * 7;
@@ -522,25 +525,23 @@
         return `PAGE_AUTH_[${pdfName}_P${pageNum}]_${hashed}`;
     }
 
-    // ---------------- NEW 4-SEPARATE PDFs DOWNLOAD ENGINE ----------------
-    async function downloadFourPDFs() {
+    // ---------------- External PDF Engine (PDF-Lib) Merging System ----------------
+    async function downloadMergedPDF() {
         const btn = document.getElementById('download-btn'); 
-        btn.innerText = "Processing 4 PDFs... Do not close"; 
+        btn.innerText = "Generating & Merging PDF... (Please wait)"; 
         btn.disabled = true;
 
         const sid = globalSessionId;
         const { jsPDF } = window.jspdf;
+        const { PDFDocument } = PDFLib;
 
         try {
-            // Function to add the unique Top-Right 5% QR Code
             const addTopRightQR = async (pdfDoc, pdfName, pageNum) => {
                 const qrUrl = await getQRDataURL(generatePageQRData(pdfName, pageNum));
-                // A4 is 210mm wide. 20mm x 20mm in top right corner (X=180, Y=10)
                 pdfDoc.addImage(qrUrl, 'PNG', 180, 10, 20, 20);
             };
 
             // ================= PDF 1: Summary =================
-            btn.innerText = "Downloading 1 of 4 (Summary)...";
             const pdf1 = new jsPDF('p', 'mm', 'a4');
             await addTopRightQR(pdf1, 'Summary', 1);
             
@@ -554,7 +555,6 @@
             pdf1.line(20, 40, 190, 40);
 
             pdf1.setFontSize(14);
-            
             let y = 60;
             const drawDataRow = (title, val, valColor) => {
                 pdf1.setFillColor(241, 245, 249); 
@@ -575,11 +575,9 @@
             drawDataRow("Total Pause Time", cachedSummaryData.totalPause, [220, 38, 38]);
             drawDataRow("Total Seeks (Drags/Skips)", `${cachedSummaryData.totalSeeks} times`, [245, 158, 11]);
 
-            pdf1.save(`1_Summary_${sid}.pdf`);
-
+            const pdf1Bytes = pdf1.output('arraybuffer');
 
             // ================= PDF 2: QR Code =================
-            btn.innerText = "Downloading 2 of 4 (QR Code)...";
             const pdf2 = new jsPDF('p', 'mm', 'a4');
             await addTopRightQR(pdf2, 'AuthSignature', 1);
 
@@ -596,11 +594,9 @@
             pdf2.setFontSize(12);
             pdf2.setTextColor(0, 0, 0);
             pdf2.text("Auth Signature", 105, 185, { align: "center" });
-            pdf2.save(`2_Auth_Signature_${sid}.pdf`);
-
+            const pdf2Bytes = pdf2.output('arraybuffer');
 
             // ================= PDF 3: Graph =================
-            btn.innerText = "Downloading 3 of 4 (Graph)...";
             const pdf3 = new jsPDF('p', 'mm', 'a4');
             await addTopRightQR(pdf3, 'Graph', 1);
 
@@ -613,11 +609,9 @@
             if (graphImgEl) {
                 pdf3.addImage(graphImgEl.src, 'PNG', 15, 45, 180, 120);
             }
-            pdf3.save(`3_Timeline_Graph_${sid}.pdf`);
-
+            const pdf3Bytes = pdf3.output('arraybuffer');
 
             // ================= PDF 4: Detailed Logs =================
-            btn.innerText = "Downloading 4 of 4 (Detailed Logs)...";
             const pdf4 = new jsPDF('p', 'mm', 'a4');
             let pageNum = 1;
             await addTopRightQR(pdf4, 'Logs', pageNum);
@@ -642,8 +636,8 @@
                 if (logY > pageHeight - 20) {
                     pdf4.addPage();
                     pageNum++;
-                    await addTopRightQR(pdf4, 'Logs', pageNum); // Add QR to new page
-                    logY = 35; // Start below the QR code area on new pages
+                    await addTopRightQR(pdf4, 'Logs', pageNum);
+                    logY = 35; 
                 }
 
                 pdf4.setTextColor(0, 0, 0); 
@@ -682,15 +676,32 @@
                 logY += 7; 
             }
 
-            pdf4.save(`4_Detailed_Logs_${sid}.pdf`);
+            const pdf4Bytes = pdf4.output('arraybuffer');
 
-            // Done
-            btn.innerText = "Download 4 Separate PDFs"; 
+            // ================= MERGE ALL PDFs USING PDF-LIB =================
+            const mergedPdf = await PDFDocument.create();
+
+            for (const pdfBytes of [pdf1Bytes, pdf2Bytes, pdf3Bytes, pdf4Bytes]) {
+                const pdf = await PDFDocument.load(pdfBytes);
+                const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+                copiedPages.forEach((page) => mergedPdf.addPage(page));
+            }
+
+            const mergedPdfFile = await mergedPdf.save();
+            
+            // Trigger the download of the single merged file
+            const blob = new Blob([mergedPdfFile], { type: 'application/pdf' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `Advanced_Tracker_Report_${sid}.pdf`;
+            link.click();
+
+            btn.innerText = "Download Single Merged PDF"; 
             btn.disabled = false;
         } catch (error) {
             console.error(error);
-            alert("An error occurred while generating the PDFs.");
-            btn.innerText = "Download 4 Separate PDFs"; 
+            alert("An error occurred while generating the merged PDF.");
+            btn.innerText = "Download Single Merged PDF"; 
             btn.disabled = false;
         }
     }
