@@ -7,7 +7,8 @@
     
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
     <style>
         * { box-sizing: border-box; }
@@ -79,11 +80,14 @@
         .download-btn:hover { background: #059669; }
         
         /* ---------------- Report Section ---------------- */
-        #printable-report { background: #ffffff; border-radius: 8px; margin-top: 20px; width: 100%; box-sizing: border-box; word-wrap: break-word; }
-        
+        #printable-report { background: #ffffff; border-radius: 8px; margin-top: 20px; width: 100%; box-sizing: border-box; }
         .session-report-block { padding: 20px; border: 2px solid #e2e8f0; border-radius: 8px; margin-bottom: 30px; background: #ffffff; width: 100%; box-sizing: border-box; }
         
-        .summary-box { background: #f1f5f9; padding: 15px; border-radius: 6px; font-weight: bold; line-height: 1.8; text-align: left; max-width: 500px; margin: 0 auto 30px auto; font-size: 1.05rem; }
+        /* New Data Format Styles */
+        .new-data-format { display: flex; flex-direction: column; gap: 10px; margin: 20px 0; width: 100%; }
+        .data-card { display: flex; justify-content: space-between; align-items: center; background: #f1f5f9; padding: 12px 20px; border-radius: 8px; border: 1px solid #e2e8f0; width: 100%; word-wrap: break-word; }
+        .data-title { font-weight: bold; color: #475569; font-size: 1rem; flex: 1; }
+        .data-value { font-weight: bold; font-size: 1.1rem; text-align: right; }
         
         .qr-wrapper { text-align: center; margin: 0 auto; padding: 20px; }
         .qr-wrapper p { margin: 15px 0 0 0; font-size: 1rem; color: #64748b; font-weight: bold; }
@@ -99,6 +103,8 @@
             .control-group { gap: 8px; justify-content: center; width: 100%; }
             #progress-bar { width: 100%; order: -1; margin-bottom: 5px; } 
             .input-group { flex-direction: column; }
+            .data-card { flex-direction: column; align-items: flex-start; gap: 5px; }
+            .data-value { text-align: left; }
         }
     </style>
 </head>
@@ -163,42 +169,31 @@
     
     <div id="report-wrapper" style="display:none;">
         <div id="printable-report"></div>
-        <button class="btn-primary download-btn" id="download-btn" onclick="downloadReportAsPDF()">Download Report as PDF</button>
+        <button class="btn-primary download-btn" id="download-btn" onclick="downloadFourPDFs()">Download 4 Separate PDFs</button>
     </div>
 </div>
 
 <script>
-    // ---------------- Anti Pull-to-Refresh Logic (JS Method) ----------------
+    // ---------------- Anti Pull-to-Refresh Logic ----------------
     let touchStartY = 0;
-    document.addEventListener('touchstart', e => { 
-        touchStartY = e.touches[0].clientY; 
-    }, {passive: false});
-    
+    document.addEventListener('touchstart', e => { touchStartY = e.touches[0].clientY; }, {passive: false});
     document.addEventListener('touchmove', e => {
         let touchY = e.touches[0].clientY;
         let touchDiff = touchY - touchStartY;
-        // Blocks refresh ONLY when pulled from the absolute top. Scrolling is fully smooth.
-        if (touchDiff > 0 && window.scrollY === 0) {
-            e.preventDefault(); 
-        }
+        if (touchDiff > 0 && window.scrollY === 0) { e.preventDefault(); }
     }, {passive: false});
 
-    // ---------------- Refresh Button Confirmation ----------------
     function confirmRefresh() {
         if (confirm("Are you sure you want to refresh? All your tracking data will be permanently lost!")) {
             window.onbeforeunload = null; 
             window.location.reload();
         }
     }
-
     window.addEventListener('beforeunload', function (e) {
-        if (sessionStartTime) { 
-            e.preventDefault();
-            e.returnValue = '';
-        }
+        if (sessionStartTime) { e.preventDefault(); e.returnValue = ''; }
     });
 
-    // ---------------- Existing Logic ----------------
+    // ---------------- System Variables ----------------
     function updateClock() { document.getElementById('ist-clock').innerText = new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true }); }
     setInterval(updateClock, 1000); updateClock();
 
@@ -208,6 +203,9 @@
     let seekCount = 0, currentSpeed = 1, isDraggingTimeline = false, isFirstPlay = true;
     let hideControlsTimeout; let isControlsVisible = true;
     let reportCounter = 0; 
+    
+    // Store variables globally for PDF generation
+    let cachedSummaryData = {};
 
     const tag = document.createElement('script');
     tag.src = "https://www.youtube.com/iframe_api";
@@ -228,7 +226,9 @@
         if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s}`;
         return `${m}:${s}`; 
     }
+    function formatDur(ms) { const totalSec = Math.floor(ms / 1000), h = Math.floor(totalSec / 3600), m = Math.floor((totalSec % 3600) / 60), s = totalSec % 60; if (h > 0) return `${h} hr ${m} min ${s} sec`; return `${m} min ${s} sec`; }
 
+    // ---------------- UI Handlers ----------------
     function toggleControlsVisibility() { if (isControlsVisible) hideControls(); else showControls(); }
     function showControls() {
         const controls = document.getElementById('custom-controls'), wrapper = document.getElementById('video-wrapper');
@@ -254,14 +254,13 @@
         icon.classList.add('show'); setTimeout(() => icon.classList.remove('show'), 500);
     }
 
+    // ---------------- Video Logic ----------------
     function initVideoLoad() {
         const videoId = extractVideoID(document.getElementById('video-url').value);
         if (!videoId) return alert("Please enter a valid YouTube link!");
 
         if (document.getElementById('report-wrapper').style.display === "block") {
-            if (!confirm("আপনি কি সত্যিই নতুন ভিডিও প্লে করতে চান? (Are you sure you want to load a new video? Previous report will be saved below.)")) {
-                return; 
-            }
+            if (!confirm("Are you sure you want to load a new video? Previous report will be saved below.")) return; 
         }
 
         document.getElementById('video-wrapper').style.display = "block";
@@ -344,16 +343,8 @@
     function seekVideo() { if (!player || !player.getDuration) return; player.seekTo((document.getElementById('progress-bar').value / 100) * player.getDuration(), true); isDraggingTimeline = false; }
     
     function changeSpeed() { const s = document.getElementById('speed-slider').value; document.getElementById('speed-display').innerText = s + "x"; if (player) player.setPlaybackRate(parseFloat(s)); showControls(); }
-    
-    function changeQuality() {
-        const q = document.getElementById('quality-select').value;
-        if (player && typeof player.setPlaybackQuality === 'function') { player.setPlaybackQuality(q); }
-        showControls();
-    }
-    function onPlaybackQualityChange(event) {
-        const select = document.getElementById('quality-select');
-        if (select.querySelector(`option[value="${event.data}"]`)) { select.value = event.data; }
-    }
+    function changeQuality() { const q = document.getElementById('quality-select').value; if (player && typeof player.setPlaybackQuality === 'function') { player.setPlaybackQuality(q); } showControls(); }
+    function onPlaybackQualityChange(event) { const select = document.getElementById('quality-select'); if (select.querySelector(`option[value="${event.data}"]`)) { select.value = event.data; } }
 
     function toggleFullScreen() {
         const w = document.getElementById('video-wrapper');
@@ -372,9 +363,8 @@
     }
     function onPlaybackRateChange(event) { currentSpeed = event.data; document.getElementById('speed-slider').value = currentSpeed; document.getElementById('speed-display').innerText = currentSpeed + "x"; logActivity("Speed", `Playback speed changed to ${currentSpeed}x`, player.getCurrentTime()); }
     function logActivity(action, details, vTimeSec) { activityLogs.push({ realTime: new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true }), videoTime: formatTimeSec(vTimeSec), action, details }); }
-    function formatDur(ms) { const totalSec = Math.floor(ms / 1000), h = Math.floor(totalSec / 3600), m = Math.floor((totalSec % 3600) / 60), s = totalSec % 60; if (h > 0) return `${h} hr ${m} min ${s} sec`; return `${m} min ${s} sec`; }
 
-    // ---------------- Modular Report Generation ----------------
+    // ---------------- Report Display on Screen ----------------
     function generateReport() {
         if (!sessionStartTime) return; 
         window.onbeforeunload = null; 
@@ -392,50 +382,61 @@
         reportCounter++;
         globalSessionId = Date.now(); 
 
+        // Cache summary data for the PDF generator
+        cachedSummaryData = {
+            totalSession: formatDur(new Date() - sessionStartTime),
+            totalPlay: formatDur(totalRealPlayTimeMs),
+            totalPause: formatDur(totalRealPauseTimeMs),
+            totalSeeks: seekCount
+        };
+
         let logsHTML = ""; 
         activityLogs.forEach(l => { 
             let col = l.action === "Play" ? "green" : l.action === "Pause" ? "red" : l.action === "Seek/Drag" ? "orange" : "blue";
-            logsHTML += `<div class="log-item" style="page-break-inside: avoid;"><span>[${l.realTime}]</span> | <span style="color: #000000;">Video Time:</span> <span>${l.videoTime}</span> | <span style="color:${col};">${l.action}</span> - <span style="color: #000000;">${l.details}</span></div>`; 
+            logsHTML += `<div class="log-item"><span>[${l.realTime}]</span> | <span style="color: #000000;">Video Time:</span> <span>${l.videoTime}</span> | <span style="color:${col};">${l.action}</span> - <span style="color: #000000;">${l.details}</span></div>`; 
         });
 
-        // Merged Master Container mapping to 4 distinct PDF Pages using page-break
+        // Visible HTML Report Block (What user sees on screen)
         const reportTemplate = `
-            <div id="master-pdf-container-${globalSessionId}" class="session-report-block" style="background-color: #ffffff;">
+            <div id="session-report-${globalSessionId}" class="session-report-block">
+                <h2 style="text-align:center; color:#1e293b; border-bottom: 2px solid #cbd5e1; padding-bottom: 15px; margin-top:0;">Official Watch Report (Session ${reportCounter})</h2>
                 
-                <div style="text-align:center; padding-bottom: 20px;">
-                    <h2 style="margin-top:0; color:#1e293b; border-bottom: 2px dashed #cbd5e1; padding-bottom: 15px;">Official Watch Report (Session ${reportCounter})</h2>
-                    <div class="summary-box">
-                        Total Session Time: ${formatDur(new Date() - sessionStartTime)}<br>
-                        Total Play Time: <span style="color: green;">${formatDur(totalRealPlayTimeMs)}</span><br>
-                        Total Pause Time: <span style="color: red;">${formatDur(totalRealPauseTimeMs)}</span><br>
-                        Total Seeks (Drags/Skips): <span style="color: orange;">${seekCount} times</span>
+                <div id="ui-summary-${globalSessionId}" class="new-data-format">
+                    <div class="data-card">
+                        <span class="data-title">Total Session Time</span>
+                        <span class="data-value">${cachedSummaryData.totalSession}</span>
+                    </div>
+                    <div class="data-card">
+                        <span class="data-title">Total Play Time</span>
+                        <span class="data-value" style="color: green;">${cachedSummaryData.totalPlay}</span>
+                    </div>
+                    <div class="data-card">
+                        <span class="data-title">Total Pause Time</span>
+                        <span class="data-value" style="color: red;">${cachedSummaryData.totalPause}</span>
+                    </div>
+                    <div class="data-card">
+                        <span class="data-title">Total Seeks (Drags/Skips)</span>
+                        <span class="data-value" style="color: orange;">${cachedSummaryData.totalSeeks} times</span>
                     </div>
                 </div>
-
-                <div class="html2pdf__page-break"></div>
 
                 <div style="text-align: center; padding-top: 20px;">
-                    <h3 style="margin-bottom: 30px; color:#1e293b;">Authentication Signature</h3>
-                    <div class="qr-wrapper">
+                    <h3 style="margin-bottom: 20px; color:#1e293b;">Authentication Signature</h3>
+                    <div class="qr-wrapper" id="qr-box-${globalSessionId}">
                         <div id="qr-${globalSessionId}" style="display: flex; justify-content: center;"></div>
-                        <p style="color: #000000;">Auth Signature</p>
                     </div>
                 </div>
 
-                <div class="html2pdf__page-break"></div>
-
                 <div style="padding-top: 20px;">
-                    <h3 style="text-align: center; margin-bottom:20px; color:#1e293b;">Timeline Graph (Real-time vs. Video Time)</h3>
-                    <div class="chart-container" id="chart-box-${globalSessionId}" style="background-color: #ffffff; page-break-inside: avoid;">
+                    <h3 style="text-align: center; margin-bottom:20px; color:#1e293b;">Timeline Graph</h3>
+                    <div class="chart-container" id="chart-box-${globalSessionId}">
                         <canvas id="graph-${globalSessionId}"></canvas>
                     </div>
                 </div>
 
-                <div class="html2pdf__page-break"></div>
-
                 <div style="padding-top: 20px;">
                     <h3 style="color:#1e293b; border-bottom: 1px solid #cbd5e1; padding-bottom: 10px;">Detailed Tracking Logs:</h3>
-                    <div style="background-color: #ffffff;">${logsHTML}</div>
+                    <div id="logs-box-${globalSessionId}">${logsHTML}</div>
                 </div>
             </div>
         `;
@@ -443,7 +444,7 @@
         document.getElementById('printable-report').insertAdjacentHTML('afterbegin', reportTemplate);
 
         renderSpecificGraph(`graph-${globalSessionId}`, `chart-box-${globalSessionId}`, graphData);
-        renderSpecificQR(`qr-${globalSessionId}`, totalRealPlayTimeMs, totalRealPauseTimeMs, seekCount, currentSpeed, sessionStartTime);
+        renderSpecificQR(`qr-${globalSessionId}`, `qr-box-${globalSessionId}`, totalRealPlayTimeMs, totalRealPauseTimeMs, seekCount, currentSpeed, sessionStartTime);
     }
     
     function renderSpecificGraph(canvasId, boxId, data) {
@@ -456,14 +457,10 @@
         new Chart(canvasElement.getContext('2d'), { 
             type: 'line', 
             data: { labels: optimizedX, datasets: [{ label: 'Video Timeline Position (sec)', data: optimizedY, borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.2)', borderWidth: 2, pointRadius: 0, tension: 0.1 }] }, 
-            options: { 
-                responsive: true, 
-                maintainAspectRatio: false,
-                animation: false 
-            } 
+            options: { responsive: true, maintainAspectRatio: false, animation: false } 
         });
 
-        // Convert Canvas element into a static pure PNG image for PDF
+        // Convert Canvas element to pure Image for flawless PDF generation
         setTimeout(() => {
             const chartBox = document.getElementById(boxId);
             if (canvasElement && chartBox) {
@@ -473,70 +470,199 @@
                 img.style.height = "100%";
                 img.style.objectFit = "contain";
                 img.style.display = "block";
-                
                 chartBox.innerHTML = ""; 
                 chartBox.appendChild(img); 
             }
         }, 800);
     }
 
-    function renderSpecificQR(containerId, pt, pa, sk, sp, startTime) {
-        const container = document.getElementById(containerId);
+    function renderSpecificQR(canvasId, boxId, pt, pa, sk, sp, startTime) {
+        const container = document.getElementById(canvasId);
         const rawData = `S:${startTime.getTime()}|PT:${pt}|PA:${pa}|SK:${sk}|SP:${sp}`;
         const hashedData = btoa(encodeURIComponent(rawData)).substring(0, 50);
         const authSignature = `AUTH_YT_${Math.floor(Math.random() * 999999)}_${hashedData}`;
         
         const tempDiv = document.createElement("div");
-        new QRCode(tempDiv, { text: authSignature, width: 220, height: 220, colorDark: "#0f172a", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.H });
+        new QRCode(tempDiv, { text: authSignature, width: 250, height: 250, colorDark: "#0f172a", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.H });
 
-        // Force conversion to pure image
         setTimeout(() => {
             const canvas = tempDiv.querySelector('canvas');
-            if (canvas) {
+            const wrapperBox = document.getElementById(boxId);
+            if (canvas && wrapperBox) {
                 const img = document.createElement("img");
                 img.src = canvas.toDataURL('image/png');
-                img.style.width = "220px";
-                img.style.height = "220px";
+                img.style.width = "250px";
+                img.style.height = "250px";
                 img.style.display = "block";
                 img.style.margin = "0 auto";
-                container.appendChild(img);
+                
+                wrapperBox.innerHTML = "";
+                wrapperBox.appendChild(img);
+                
+                const p = document.createElement("p");
+                p.innerText = "Auth Signature";
+                p.style.color = "#000000";
+                wrapperBox.appendChild(p);
             }
         }, 300);
     }
 
-    // ---------------- Merged PDF Download Generation ----------------
-    async function downloadReportAsPDF() {
+    // ---------------- jsPDF Engine for 4 Separate Perfect PDFs ----------------
+    async function downloadFourPDFs() {
         const btn = document.getElementById('download-btn'); 
-        btn.innerText = "Generating Merged PDF... (Please wait)"; 
+        btn.innerText = "Processing 4 PDFs... Do not close"; 
         btn.disabled = true;
 
-        const element = document.getElementById(`master-pdf-container-${globalSessionId}`);
-        const originalWidth = element.style.width;
-        element.style.width = '800px';
+        const sid = globalSessionId;
+        const { jsPDF } = window.jspdf;
 
-        const opt = {
-            margin:       10, 
-            filename:     `Video_Audit_Report_${new Date().getTime()}.pdf`,
-            image:        { type: 'jpeg', quality: 1.0 },
-            html2canvas:  { scale: 2, useCORS: true, windowWidth: 800, backgroundColor: '#ffffff' }, 
-            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-            pagebreak:    { mode: ['css', 'legacy'] } 
-        };
+        try {
+            // ================= PDF 1: Summary =================
+            btn.innerText = "Downloading 1 of 4 (Summary)...";
+            const pdf1 = new jsPDF('p', 'mm', 'a4');
+            pdf1.setFont("helvetica", "bold");
+            pdf1.setFontSize(22);
+            pdf1.setTextColor(30, 41, 59);
+            pdf1.text(`Official Watch Report (Session ${reportCounter})`, 105, 30, { align: "center" });
+            
+            pdf1.setLineWidth(0.5);
+            pdf1.setDrawColor(203, 213, 225);
+            pdf1.line(20, 40, 190, 40);
 
-        setTimeout(async () => {
-            try {
-                await html2pdf().set(opt).from(element).save();
-                element.style.width = originalWidth;
-                btn.innerText = "Download Report as PDF"; 
-                btn.disabled = false;
-            } catch (error) {
-                console.error(error);
-                alert("Error generating PDF! Please try again.");
-                element.style.width = originalWidth;
-                btn.innerText = "Download Report as PDF"; 
-                btn.disabled = false;
+            pdf1.setFontSize(14);
+            pdf1.setTextColor(71, 85, 105);
+            
+            // Draw custom boxes using native jsPDF rects for perfect crisp text
+            let y = 60;
+            const drawDataRow = (title, val, valColor) => {
+                pdf1.setFillColor(241, 245, 249); // #f1f5f9
+                pdf1.setDrawColor(226, 232, 240); // #e2e8f0
+                pdf1.roundedRect(20, y, 170, 15, 3, 3, 'FD'); // Filled and outlined rounded rect
+                
+                pdf1.setFont("helvetica", "bold");
+                pdf1.setTextColor(71, 85, 105);
+                pdf1.text(title, 25, y + 10);
+                
+                pdf1.setTextColor(valColor[0], valColor[1], valColor[2]);
+                pdf1.text(val, 185, y + 10, { align: "right" });
+                y += 25;
+            };
+
+            drawDataRow("Total Session Time", cachedSummaryData.totalSession, [0, 0, 0]);
+            drawDataRow("Total Play Time", cachedSummaryData.totalPlay, [0, 128, 0]);
+            drawDataRow("Total Pause Time", cachedSummaryData.totalPause, [220, 38, 38]);
+            drawDataRow("Total Seeks (Drags/Skips)", `${cachedSummaryData.totalSeeks} times`, [245, 158, 11]);
+
+            pdf1.save(`1_Summary_${sid}.pdf`);
+
+
+            // ================= PDF 2: QR Code =================
+            btn.innerText = "Downloading 2 of 4 (QR Code)...";
+            const pdf2 = new jsPDF('p', 'mm', 'a4');
+            pdf2.setFont("helvetica", "bold");
+            pdf2.setFontSize(18);
+            pdf2.setTextColor(30, 41, 59);
+            pdf2.text("Authentication Signature", 105, 50, { align: "center" });
+
+            const qrImgEl = document.querySelector(`#qr-box-${sid} img`);
+            if (qrImgEl) {
+                // Centered 100x100 mm image
+                pdf2.addImage(qrImgEl.src, 'PNG', 55, 70, 100, 100);
             }
-        }, 1200); 
+            
+            pdf2.setFontSize(12);
+            pdf2.setTextColor(0, 0, 0);
+            pdf2.text("Auth Signature", 105, 185, { align: "center" });
+            pdf2.save(`2_Auth_Signature_${sid}.pdf`);
+
+
+            // ================= PDF 3: Graph =================
+            btn.innerText = "Downloading 3 of 4 (Graph)...";
+            const pdf3 = new jsPDF('p', 'mm', 'a4');
+            pdf3.setFont("helvetica", "bold");
+            pdf3.setFontSize(16);
+            pdf3.setTextColor(30, 41, 59);
+            pdf3.text("Timeline Graph (Real-time vs. Video Time)", 105, 30, { align: "center" });
+
+            const graphImgEl = document.querySelector(`#chart-box-${sid} img`);
+            if (graphImgEl) {
+                pdf3.addImage(graphImgEl.src, 'PNG', 15, 45, 180, 120);
+            }
+            pdf3.save(`3_Timeline_Graph_${sid}.pdf`);
+
+
+            // ================= PDF 4: Detailed Logs =================
+            btn.innerText = "Downloading 4 of 4 (Detailed Logs)...";
+            const pdf4 = new jsPDF('p', 'mm', 'a4');
+            pdf4.setFont("helvetica", "bold");
+            pdf4.setFontSize(16);
+            pdf4.setTextColor(30, 41, 59);
+            pdf4.text("Detailed Tracking Logs", 20, 20);
+            
+            pdf4.setLineWidth(0.5);
+            pdf4.setDrawColor(203, 213, 225);
+            pdf4.line(20, 25, 190, 25);
+
+            pdf4.setFont("helvetica", "normal");
+            pdf4.setFontSize(11);
+            let logY = 35;
+            const pageHeight = pdf4.internal.pageSize.getHeight();
+
+            activityLogs.forEach(l => {
+                if (logY > pageHeight - 20) {
+                    pdf4.addPage();
+                    logY = 20; // reset Y for new page
+                }
+
+                pdf4.setTextColor(0, 0, 0); // Black bracket text
+                pdf4.setFont("helvetica", "bold");
+                const timeText = `[${l.realTime}]`;
+                pdf4.text(timeText, 20, logY);
+                let currentX = 20 + pdf4.getTextWidth(timeText) + 2;
+
+                pdf4.setFont("helvetica", "normal");
+                pdf4.text(" | Video Time: ", currentX, logY);
+                currentX += pdf4.getTextWidth(" | Video Time: ");
+
+                pdf4.setFont("helvetica", "bold");
+                pdf4.text(l.videoTime, currentX, logY);
+                currentX += pdf4.getTextWidth(l.videoTime) + 2;
+
+                pdf4.setFont("helvetica", "normal");
+                pdf4.text(" | ", currentX, logY);
+                currentX += pdf4.getTextWidth(" | ");
+
+                // Colorize the action word
+                pdf4.setFont("helvetica", "bold");
+                if (l.action === "Play") pdf4.setTextColor(0, 128, 0);
+                else if (l.action === "Pause") pdf4.setTextColor(220, 38, 38);
+                else if (l.action === "Seek/Drag") pdf4.setTextColor(245, 158, 11);
+                else pdf4.setTextColor(37, 99, 235);
+                pdf4.text(l.action, currentX, logY);
+                currentX += pdf4.getTextWidth(l.action) + 2;
+
+                pdf4.setTextColor(0, 0, 0); // Back to black
+                pdf4.setFont("helvetica", "normal");
+                pdf4.text(`- ${l.details}`, currentX, logY);
+
+                // Add faint separator line
+                logY += 4;
+                pdf4.setDrawColor(226, 232, 240);
+                pdf4.line(20, logY, 190, logY);
+                logY += 7; // spacing for next row
+            });
+
+            pdf4.save(`4_Detailed_Logs_${sid}.pdf`);
+
+            // Done
+            btn.innerText = "Download 4 Separate PDFs"; 
+            btn.disabled = false;
+        } catch (error) {
+            console.error(error);
+            alert("An error occurred while generating the PDFs.");
+            btn.innerText = "Download 4 Separate PDFs"; 
+            btn.disabled = false;
+        }
     }
 </script>
 </body>
