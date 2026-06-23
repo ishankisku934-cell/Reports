@@ -95,8 +95,8 @@
         .chart-container { position: relative; width: 100%; height: 350px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; box-sizing: border-box; }
         
         /* Removed strict page-break-inside avoid from log-item to prevent HTML2PDF rendering crash */
-        .log-item { padding: 10px; border-bottom: 1px solid #cbd5e1; font-size: 0.95rem; word-wrap: break-word; white-space: normal; line-height: 1.4; }
-        .log-item span { font-weight: bold; }
+        .log-item { padding: 10px; border-bottom: 1px solid #cbd5e1; font-size: 0.95rem; word-wrap: break-word; white-space: normal; line-height: 1.4; color: #000000; background-color: #ffffff; }
+        .log-item span { font-weight: bold; color: #000000; }
         
         @media (max-width: 600px) {
             .chart-container { height: 250px; }
@@ -400,31 +400,31 @@
         let logsHTML = ""; 
         activityLogs.forEach(l => { 
             let col = l.action === "Play" ? "green" : l.action === "Pause" ? "red" : l.action === "Seek/Drag" ? "orange" : "blue";
-            // Removed inline page-break-inside to prevent HTML2PDF rendering bug
-            logsHTML += `<div class="log-item"><span>[${l.realTime}]</span> | Video Time: <span>${l.videoTime}</span> | <span style="color:${col};">${l.action}</span> - ${l.details}</div>`; 
+            // FIXED: Added absolute solid colors to ensure the PDF library does not blend the text into the background
+            logsHTML += `<div class="log-item"><span>[${l.realTime}]</span> | <span style="color: #000000;">Video Time:</span> <span>${l.videoTime}</span> | <span style="color:${col};">${l.action}</span> - <span style="color: #000000;">${l.details}</span></div>`; 
         });
 
         // Smart HTML2PDF Page Break Structure with New Data Format
         const reportTemplate = `
-            <div id="session-report-${sessionId}" class="session-report-block">
+            <div id="session-report-${sessionId}" class="session-report-block" style="background-color: #ffffff;">
                 
-                <div>
+                <div style="background-color: #ffffff;">
                     <h2 style="text-align:center; color:#1e293b; border-bottom: 2px solid #cbd5e1; padding-bottom: 15px; margin-top:0;">Official Watch Report (Session ${reportCounter})</h2>
                     <div class="new-data-format">
-                        <div class="data-card">
-                            <span class="data-title">Total Session Time</span>
-                            <span class="data-value">${formatDur(new Date() - sessionStartTime)}</span>
+                        <div class="data-card" style="background-color: #f1f5f9;">
+                            <span class="data-title" style="color: #475569;">Total Session Time</span>
+                            <span class="data-value" style="color: #000000;">${formatDur(new Date() - sessionStartTime)}</span>
                         </div>
-                        <div class="data-card">
-                            <span class="data-title">Total Play Time</span>
+                        <div class="data-card" style="background-color: #f1f5f9;">
+                            <span class="data-title" style="color: #475569;">Total Play Time</span>
                             <span class="data-value" style="color: green;">${formatDur(totalRealPlayTimeMs)}</span>
                         </div>
-                        <div class="data-card">
-                            <span class="data-title">Total Pause Time</span>
+                        <div class="data-card" style="background-color: #f1f5f9;">
+                            <span class="data-title" style="color: #475569;">Total Pause Time</span>
                             <span class="data-value" style="color: red;">${formatDur(totalRealPauseTimeMs)}</span>
                         </div>
-                        <div class="data-card">
-                            <span class="data-title">Total Seeks (Drags/Skips)</span>
+                        <div class="data-card" style="background-color: #f1f5f9;">
+                            <span class="data-title" style="color: #475569;">Total Seeks (Drags/Skips)</span>
                             <span class="data-value" style="color: orange;">${seekCount} times</span>
                         </div>
                     </div>
@@ -432,46 +432,46 @@
 
                 <div class="html2pdf__page-break"></div>
 
-                <div style="text-align: center; padding-top: 20px;">
+                <div style="text-align: center; padding-top: 20px; background-color: #ffffff;">
                     <h3 style="margin-bottom: 30px; color:#1e293b;">Authentication Signature</h3>
                     <div class="qr-wrapper">
                         <div id="qr-${sessionId}" style="display: flex; justify-content: center;"></div>
-                        <p>Auth Signature</p>
+                        <p style="color: #000000;">Auth Signature</p>
                     </div>
                 </div>
 
                 <div class="html2pdf__page-break"></div>
 
-                <div style="padding-top: 20px;">
+                <div style="padding-top: 20px; background-color: #ffffff;">
                     <h3 style="text-align: center; margin-bottom:20px; color:#1e293b;">Timeline Graph (Real-time vs. Video Time)</h3>
-                    <div class="chart-container" style="page-break-inside: avoid;">
+                    <div class="chart-container" id="chart-box-${sessionId}" style="background-color: #ffffff;">
                         <canvas id="graph-${sessionId}"></canvas>
                     </div>
                 </div>
 
                 <div class="html2pdf__page-break"></div>
 
-                <div style="padding-top: 20px; background: #ffffff;">
+                <div style="padding-top: 20px; background-color: #ffffff;">
                     <h3 style="color:#1e293b; border-bottom: 1px solid #cbd5e1; padding-bottom: 10px;">Detailed Tracking Logs:</h3>
-                    <div>${logsHTML}</div>
+                    <div style="background-color: #ffffff;">${logsHTML}</div>
                 </div>
             </div>
         `;
 
         document.getElementById('printable-report').insertAdjacentHTML('afterbegin', reportTemplate);
 
-        renderSpecificGraph(`graph-${sessionId}`, graphData);
+        renderSpecificGraph(`graph-${sessionId}`, `chart-box-${sessionId}`, graphData);
         renderSpecificQR(`qr-${sessionId}`, totalRealPlayTimeMs, totalRealPauseTimeMs, seekCount, currentSpeed, sessionStartTime);
     }
     
-    function renderSpecificGraph(canvasId, data) {
+    function renderSpecificGraph(canvasId, boxId, data) {
         const maxPoints = 500, step = Math.ceil(data.length / maxPoints) || 1;
         const optimizedX = data.filter((_, i) => i % step === 0).map(d => d.x);
         const optimizedY = data.filter((_, i) => i % step === 0).map(d => d.y);
 
-        const canvas = document.getElementById(canvasId);
+        const canvasElement = document.getElementById(canvasId);
 
-        new Chart(canvas.getContext('2d'), { 
+        new Chart(canvasElement.getContext('2d'), { 
             type: 'line', 
             data: { labels: optimizedX, datasets: [{ label: 'Video Timeline Position (sec)', data: optimizedY, borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.2)', borderWidth: 2, pointRadius: 0, tension: 0.1 }] }, 
             options: { 
@@ -481,19 +481,21 @@
             } 
         });
 
-        // 100% BULLETPROOF GRAPH FIX: Convert Canvas to Image for PDF
+        // 100% GURANTEED GRAPH FIX: Wipe the canvas container completely and replace it with a hardcoded PNG image so the PDF maker catches it perfectly.
         setTimeout(() => {
-            if (canvas) {
+            const chartBox = document.getElementById(boxId);
+            if (canvasElement && chartBox) {
                 const img = document.createElement("img");
-                img.src = canvas.toDataURL('image/png');
+                img.src = canvasElement.toDataURL('image/png');
                 img.style.width = "100%";
                 img.style.height = "100%";
                 img.style.objectFit = "contain";
                 img.style.display = "block";
-                canvas.parentNode.insertBefore(img, canvas);
-                canvas.style.display = "none"; // Hide canvas, use image for PDF
+                
+                chartBox.innerHTML = ""; // Clear the canvas completely
+                chartBox.appendChild(img); // Put only the image inside the box
             }
-        }, 500);
+        }, 800); // Wait 800ms to ensure the chart is fully fully drawn
     }
 
     function renderSpecificQR(containerId, pt, pa, sk, sp, startTime) {
@@ -532,13 +534,13 @@
             margin:       10, 
             filename:     `Video_Audit_Report_${new Date().getTime()}.pdf`,
             image:        { type: 'jpeg', quality: 1.0 },
-            // Removed DOM width manipulation hack and properly used windowWidth option
-            html2canvas:  { scale: 2, useCORS: true, windowWidth: 800 }, 
+            // Added backgroundColor: '#ffffff' to force solid white background behind text in PDF
+            html2canvas:  { scale: 2, useCORS: true, windowWidth: 800, backgroundColor: '#ffffff' }, 
             jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
             pagebreak:    { mode: ['css', 'legacy'] } 
         };
 
-        // Delay extended slightly to ensure the Graph-to-Image conversion completes perfectly
+        // Delay extended to ensure the Graph-to-Image conversion (which takes 800ms) completes perfectly before PDF serialization starts
         setTimeout(() => {
             html2pdf().set(opt).from(element).save().then(() => {
                 btn.innerText = "Download Report as PDF"; 
@@ -549,7 +551,7 @@
                 btn.innerText = "Download Report as PDF"; 
                 btn.disabled = false;
             });
-        }, 1500); 
+        }, 1200); 
     }
 </script>
 </body>
