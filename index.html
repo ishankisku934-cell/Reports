@@ -120,7 +120,9 @@
     </div>
 
     <div class="input-group">
-        <input type="text" id="video-url" placeholder="Enter YouTube Video URL here...">
+        <input type="text" id="video-url" placeholder="YouTube Video URL...">
+        <input type="text" id="viewer-name" placeholder="Viewer's Name...">
+        <input type="text" id="lecture-name" placeholder="Lecture Name...">
         <button class="btn-primary" onclick="initVideoLoad()">Load Video</button>
     </div>
 
@@ -183,7 +185,6 @@
     document.addEventListener('touchmove', e => {
         let touchY = e.touches[0].clientY;
         let touchDiff = touchY - touchStartY;
-        // Blocks refresh ONLY when pulled from the absolute top.
         if (touchDiff > 0 && window.scrollY === 0) {
             e.preventDefault(); 
         }
@@ -214,6 +215,11 @@
     let hideControlsTimeout; let isControlsVisible = true;
     let reportCounter = 0; 
     let cachedSummaryData = {};
+    
+    // Store user inputs
+    let currentVideoUrl = "";
+    let currentUserName = "";
+    let currentLectureName = "";
 
     const tag = document.createElement('script');
     tag.src = "https://www.youtube.com/iframe_api";
@@ -264,8 +270,16 @@
 
     // ---------------- Video Logic ----------------
     function initVideoLoad() {
-        const videoId = extractVideoID(document.getElementById('video-url').value);
-        if (!videoId) return alert("Please enter a valid YouTube link!");
+        currentVideoUrl = document.getElementById('video-url').value.trim();
+        currentUserName = document.getElementById('viewer-name').value.trim();
+        currentLectureName = document.getElementById('lecture-name').value.trim();
+
+        if (!currentVideoUrl) return alert("Please enter a valid YouTube link!");
+        if (!currentUserName) return alert("Please enter the Viewer's Name!");
+        if (!currentLectureName) return alert("Please enter the Lecture Name!");
+
+        const videoId = extractVideoID(currentVideoUrl);
+        if (!videoId) return alert("Invalid YouTube URL format!");
 
         if (document.getElementById('report-wrapper').style.display === "block") {
             if (!confirm("Are you sure you want to load a new video? Previous report will be saved below.")) return; 
@@ -407,6 +421,8 @@
                 <h2 style="text-align:center; color:#1e293b; border-bottom: 2px solid #cbd5e1; padding-bottom: 15px; margin-top:0;">Official Watch Report (Session ${reportCounter})</h2>
                 
                 <div class="new-data-format">
+                    <div class="data-card"><span class="data-title">Viewer Name</span><span class="data-value">${currentUserName}</span></div>
+                    <div class="data-card"><span class="data-title">Lecture Name</span><span class="data-value">${currentLectureName}</span></div>
                     <div class="data-card"><span class="data-title">Total Session Time</span><span class="data-value">${cachedSummaryData.totalSession}</span></div>
                     <div class="data-card"><span class="data-title">Total Play Time</span><span class="data-value" style="color: green;">${cachedSummaryData.totalPlay}</span></div>
                     <div class="data-card"><span class="data-title">Total Pause Time</span><span class="data-value" style="color: red;">${cachedSummaryData.totalPause}</span></div>
@@ -487,10 +503,8 @@
                 img.style.height = "250px";
                 img.style.display = "block";
                 img.style.margin = "0 auto";
-                
                 wrapperBox.innerHTML = "";
                 wrapperBox.appendChild(img);
-                
                 const p = document.createElement("p");
                 p.innerText = "Auth Signature";
                 p.style.color = "#000000";
@@ -499,7 +513,7 @@
         }, 300);
     }
 
-    // ---------------- QR Code Helper for PDF Generation ----------------
+    // ---------------- Custom Complex QR Generator Helper ----------------
     function getQRDataURL(text) {
         return new Promise((resolve) => {
             const tempDiv = document.createElement("div");
@@ -516,6 +530,13 @@
                 resolve(canvas.toDataURL('image/png'));
             }, 50);
         });
+    }
+
+    function generateSecureHash(prefix, data) {
+        const salt = Math.floor(Math.random() * 9999999);
+        const raw = `${prefix}|DATA:${data}|TIME:${Date.now()}|SALT:${salt}`;
+        const hashed = btoa(encodeURIComponent(raw)).substring(0, 45);
+        return `${prefix}_SECURE_[${hashed}]`;
     }
 
     function generatePageQRData(pdfName, pageNum) {
@@ -544,32 +565,44 @@
             // ================= PDF 1: Summary =================
             const pdf1 = new jsPDF('p', 'mm', 'a4');
             await addTopRightQR(pdf1, 'Summary', 1);
+
+            // Left 3 QRs (URL, Viewer Name, Lecture Name)
+            const qr1Url = await getQRDataURL(generateSecureHash('URL', currentVideoUrl));
+            const qr2Url = await getQRDataURL(generateSecureHash('USER', currentUserName));
+            const qr3Url = await getQRDataURL(generateSecureHash('LEC', currentLectureName));
+
+            pdf1.addImage(qr1Url, 'PNG', 10, 10, 20, 20);
+            pdf1.addImage(qr2Url, 'PNG', 32, 10, 20, 20);
+            pdf1.addImage(qr3Url, 'PNG', 54, 10, 20, 20);
             
             pdf1.setFont("helvetica", "bold");
             pdf1.setFontSize(22);
             pdf1.setTextColor(30, 41, 59);
-            pdf1.text(`Official Watch Report (Session ${reportCounter})`, 105, 30, { align: "center" });
+            pdf1.text(`Official Watch Report (Session ${reportCounter})`, 105, 38, { align: "center" });
             
             pdf1.setLineWidth(0.5);
             pdf1.setDrawColor(203, 213, 225);
-            pdf1.line(20, 40, 190, 40);
+            pdf1.line(20, 45, 190, 45);
 
             pdf1.setFontSize(14);
-            let y = 60;
+            let y = 55;
             const drawDataRow = (title, val, valColor) => {
                 pdf1.setFillColor(241, 245, 249); 
                 pdf1.setDrawColor(226, 232, 240); 
-                pdf1.roundedRect(20, y, 170, 15, 3, 3, 'FD'); 
+                pdf1.roundedRect(20, y, 170, 12, 2, 2, 'FD'); 
                 
                 pdf1.setFont("helvetica", "bold");
                 pdf1.setTextColor(71, 85, 105);
-                pdf1.text(title, 25, y + 10);
+                pdf1.text(title, 25, y + 8);
                 
                 pdf1.setTextColor(valColor[0], valColor[1], valColor[2]);
-                pdf1.text(val, 185, y + 10, { align: "right" });
-                y += 25;
+                let safeVal = val.length > 50 ? val.substring(0, 47) + "..." : val;
+                pdf1.text(safeVal, 185, y + 8, { align: "right" });
+                y += 18;
             };
 
+            drawDataRow("Viewer Name", currentUserName, [0, 0, 0]);
+            drawDataRow("Lecture Name", currentLectureName, [0, 0, 0]);
             drawDataRow("Total Session Time", cachedSummaryData.totalSession, [0, 0, 0]);
             drawDataRow("Total Play Time", cachedSummaryData.totalPlay, [0, 128, 0]);
             drawDataRow("Total Pause Time", cachedSummaryData.totalPause, [220, 38, 38]);
