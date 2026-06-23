@@ -94,6 +94,7 @@
         
         .chart-container { position: relative; width: 100%; height: 350px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; box-sizing: border-box; }
         
+        /* Removed strict page-break-inside avoid from log-item to prevent HTML2PDF rendering crash */
         .log-item { padding: 10px; border-bottom: 1px solid #cbd5e1; font-size: 0.95rem; word-wrap: break-word; white-space: normal; line-height: 1.4; }
         .log-item span { font-weight: bold; }
         
@@ -399,8 +400,8 @@
         let logsHTML = ""; 
         activityLogs.forEach(l => { 
             let col = l.action === "Play" ? "green" : l.action === "Pause" ? "red" : l.action === "Seek/Drag" ? "orange" : "blue";
-            // Ensure no line is cut in half across pages
-            logsHTML += `<div class="log-item" style="page-break-inside: avoid;"><span>[${l.realTime}]</span> | Video Time: <span>${l.videoTime}</span> | <span style="color:${col};">${l.action}</span> - ${l.details}</div>`; 
+            // Removed inline page-break-inside to prevent HTML2PDF rendering bug
+            logsHTML += `<div class="log-item"><span>[${l.realTime}]</span> | Video Time: <span>${l.videoTime}</span> | <span style="color:${col};">${l.action}</span> - ${l.details}</div>`; 
         });
 
         // Smart HTML2PDF Page Break Structure with New Data Format
@@ -450,7 +451,7 @@
 
                 <div class="html2pdf__page-break"></div>
 
-                <div style="padding-top: 20px;">
+                <div style="padding-top: 20px; background: #ffffff;">
                     <h3 style="color:#1e293b; border-bottom: 1px solid #cbd5e1; padding-bottom: 10px;">Detailed Tracking Logs:</h3>
                     <div>${logsHTML}</div>
                 </div>
@@ -468,15 +469,31 @@
         const optimizedX = data.filter((_, i) => i % step === 0).map(d => d.x);
         const optimizedY = data.filter((_, i) => i % step === 0).map(d => d.y);
 
-        new Chart(document.getElementById(canvasId).getContext('2d'), { 
+        const canvas = document.getElementById(canvasId);
+
+        new Chart(canvas.getContext('2d'), { 
             type: 'line', 
             data: { labels: optimizedX, datasets: [{ label: 'Video Timeline Position (sec)', data: optimizedY, borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.2)', borderWidth: 2, pointRadius: 0, tension: 0.1 }] }, 
             options: { 
                 responsive: true, 
                 maintainAspectRatio: false,
-                animation: false // CRITICAL FIX: Disable animation so PDF catches the graph instantly
+                animation: false 
             } 
         });
+
+        // 100% BULLETPROOF GRAPH FIX: Convert Canvas to Image for PDF
+        setTimeout(() => {
+            if (canvas) {
+                const img = document.createElement("img");
+                img.src = canvas.toDataURL('image/png');
+                img.style.width = "100%";
+                img.style.height = "100%";
+                img.style.objectFit = "contain";
+                img.style.display = "block";
+                canvas.parentNode.insertBefore(img, canvas);
+                canvas.style.display = "none"; // Hide canvas, use image for PDF
+            }
+        }, 500);
     }
 
     function renderSpecificQR(containerId, pt, pa, sk, sp, startTime) {
@@ -511,34 +528,28 @@
 
         const element = document.getElementById('printable-report');
 
-        // Prevent layout squishing by forcing a desktop-like width before print
-        const originalWidth = element.style.width;
-        element.style.width = '800px';
-
         const opt = {
             margin:       10, 
             filename:     `Video_Audit_Report_${new Date().getTime()}.pdf`,
             image:        { type: 'jpeg', quality: 1.0 },
+            // Removed DOM width manipulation hack and properly used windowWidth option
             html2canvas:  { scale: 2, useCORS: true, windowWidth: 800 }, 
             jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-            // Legacy mode correctly parses .html2pdf__page-break
             pagebreak:    { mode: ['css', 'legacy'] } 
         };
 
-        // Delay added to ensure graph and QR are fully rendered before snapshot
+        // Delay extended slightly to ensure the Graph-to-Image conversion completes perfectly
         setTimeout(() => {
             html2pdf().set(opt).from(element).save().then(() => {
-                element.style.width = originalWidth; // Restore width
                 btn.innerText = "Download Report as PDF"; 
                 btn.disabled = false;
             }).catch(err => {
                 console.error(err);
                 alert("Error generating PDF!");
-                element.style.width = originalWidth;
                 btn.innerText = "Download Report as PDF"; 
                 btn.disabled = false;
             });
-        }, 1000); // 1 Second Delay for Perfect Print
+        }, 1500); 
     }
 </script>
 </body>
